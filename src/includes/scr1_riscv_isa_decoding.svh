@@ -32,7 +32,10 @@ typedef enum logic [6:2] {
     SCR1_OPCODE_BRANCH      = 5'b11000,
     SCR1_OPCODE_JALR        = 5'b11001,
     SCR1_OPCODE_JAL         = 5'b11011,
-    SCR1_OPCODE_SYSTEM      = 5'b11100
+    SCR1_OPCODE_SYSTEM      = 5'b11100,
+	 SCR1_OPCODE_VALU        = 5'b00010,
+	 SCR1_OPCODE_VLOAD       = 5'b11101,
+	 SCR1_OPCODE_VSTORE      = 5'b11110
 } type_scr1_rvi_opcode_e;
 
 
@@ -107,9 +110,11 @@ typedef enum logic [SCR1_LSU_CMD_WIDTH_E-1:0] {
     SCR1_LSU_CMD_LW,
     SCR1_LSU_CMD_LBU,
     SCR1_LSU_CMD_LHU,
+    SCR1_LSU_CMD_LV,
     SCR1_LSU_CMD_SB,
     SCR1_LSU_CMD_SH,
-    SCR1_LSU_CMD_SW
+    SCR1_LSU_CMD_SW,
+    SCR1_LSU_CMD_SV
 } type_scr1_lsu_cmd_sel_e;
 
 //-------------------------------------------------------------------------------
@@ -175,6 +180,9 @@ typedef struct packed {
                                                         // used as instruction field for illegal instruction exception
     logic                               exc_req;
     type_scr1_exc_code_e                exc_code;
+	 logic                               rs1_is_vector;     // is vector operation?
+	 logic                               rs2_is_vector;     // is vector operation?
+	 logic                               rd_is_vector;     // is vector operation?
 } type_scr1_exu_cmd_s;
 
 `endif // SCR1_RISCV_ISA_DECODING_SVH

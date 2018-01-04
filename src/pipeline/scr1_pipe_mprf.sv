@@ -5,6 +5,7 @@
 
 `include "scr1_arch_description.svh"
 `include "scr1_arch_types.svh"
+`include "defines.svh"
 
 module scr1_pipe_mprf (
     // Common
@@ -13,12 +14,15 @@ module scr1_pipe_mprf (
 
     // EXU <-> MPRF interface
     input   logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rs1_addr,       // MPRF rs1 read address
-    output  logic [`SCR1_XLEN-1:0]              mprf2exu_rs1_data,       // MPRF rs1 read data
+    input   logic                               rs1_is_vector,
+    output  type_vector                         mprf2exu_rs1_data,       // MPRF rs1 read data
     input   logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rs2_addr,       // MPRF rs2 read address
-    output  logic [`SCR1_XLEN-1:0]              mprf2exu_rs2_data,       // MPRF rs2 read data
+    input   logic                               rs2_is_vector,
+    output  type_vector                         mprf2exu_rs2_data,       // MPRF rs2 read data
     input   logic                               exu2mprf_w_req,          // MPRF write request
     input   logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rd_addr,        // MPRF rd write address
-    input   logic [`SCR1_XLEN-1:0]              exu2mprf_rd_data         // MPRF rd write data
+    input   logic                               rd_is_vector,
+    input   type_vector                         exu2mprf_rd_data         // MPRF rd write data
 );
 
 
@@ -27,26 +31,37 @@ module scr1_pipe_mprf (
 //-------------------------------------------------------------------------------
 `ifdef SCR1_RVE_EXT
 type_scr1_mprf_v [1:15]     mprf_int;
+type_vector      [1:15]     mprf_vector;
 `else // ~SCR1_RVE_EXT
 type_scr1_mprf_v [1:31]     mprf_int;
+type_vector      [1:31]     mprf_vector;
 `endif // ~SCR1_RVE_EXT
 
 //-------------------------------------------------------------------------------
 // Read MPRF
 //-------------------------------------------------------------------------------
-assign mprf2exu_rs1_data = (|exu2mprf_rs1_addr) ? mprf_int[unsigned'(exu2mprf_rs1_addr)] : '0;
-assign mprf2exu_rs2_data = (|exu2mprf_rs2_addr) ? mprf_int[unsigned'(exu2mprf_rs2_addr)] : '0;
+assign mprf2exu_rs1_data = (|exu2mprf_rs1_addr) ? 
+									( rs1_is_vector ? mprf_vector[unsigned'(exu2mprf_rs1_addr)] : {`LANE{mprf_int[unsigned'(exu2mprf_rs1_addr)]}} )
+									: '0;
+
+assign mprf2exu_rs2_data = (|exu2mprf_rs2_addr) ? 
+									( rs2_is_vector ? mprf_vector[unsigned'(exu2mprf_rs2_addr)] : {`LANE{mprf_int[unsigned'(exu2mprf_rs2_addr)]}} )
+	                        : '0;
 
 //-------------------------------------------------------------------------------
 // Write MPRF
 //-------------------------------------------------------------------------------
 always_ff @(negedge rst_n, posedge clk) begin
     if (~rst_n) begin
-        mprf_int <= '0;
+		  mprf_int <= '0;
+        mprf_vector <= '0;
     end else begin
         if (exu2mprf_w_req) begin
             if (|exu2mprf_rd_addr) begin
-                mprf_int[unsigned'(exu2mprf_rd_addr)] <= exu2mprf_rd_data;
+						if(rd_is_vector)
+                		mprf_vector[unsigned'(exu2mprf_rd_addr)] <= exu2mprf_rd_data;
+						else
+                		mprf_int[unsigned'(exu2mprf_rd_addr)] <= exu2mprf_rd_data[0];  //using the lane 0
             end
         end
    end
@@ -60,7 +75,7 @@ end
 
 SCR1_SVA_MPRF_WRITEX : assert property (
     @(negedge clk) disable iff (~rst_n)
-    exu2mprf_w_req |-> !$isunknown({exu2mprf_rd_addr, (|exu2mprf_rd_addr ? exu2mprf_rd_data : `SCR1_XLEN'd0)})
+    exu2mprf_w_req |-> !$isunknown({exu2mprf_rd_addr, (|exu2mprf_rd_addr ? exu2mprf_rd_data : {`LANE{`SCR1_XLEN'd0}})})
     ) else $error("MPRF error: unknown values");
 
 `endif // SCR1_SIM_ENV

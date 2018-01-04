@@ -4,6 +4,7 @@
 ///
 `include "scr1_memif.svh"
 `include "scr1_arch_description.svh"
+`include "defines.svh"
 
 module scr1_dmem_router
 #(
@@ -23,8 +24,8 @@ module scr1_dmem_router
     input   type_scr1_mem_cmd_e             dmem_cmd,
     input   type_scr1_mem_width_e           dmem_width,
     input   logic [`SCR1_DMEM_AWIDTH-1:0]   dmem_addr,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]   dmem_wdata,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]   dmem_rdata,
+    input   type_vector						     dmem_wdata,
+    output  type_vector						     dmem_rdata,
     output  type_scr1_mem_resp_e            dmem_resp,
 
     // PORT0 interface
@@ -43,8 +44,8 @@ module scr1_dmem_router
     output  type_scr1_mem_cmd_e             port1_cmd,
     output  type_scr1_mem_width_e           port1_width,
     output  logic [`SCR1_DMEM_AWIDTH-1:0]   port1_addr,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]   port1_wdata,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]   port1_rdata,
+    output  type_vector						     port1_wdata,
+    input   type_vector						     port1_rdata,
     input   type_scr1_mem_resp_e            port1_resp,
 
     // PORT2 interface
@@ -78,7 +79,7 @@ typedef enum logic [1:0] {
 type_scr1_fsm_e                 fsm;
 type_scr1_sel_e                 port_sel;
 type_scr1_sel_e                 port_sel_r;
-logic [`SCR1_DMEM_DWIDTH-1:0]   sel_rdata;
+type_vector					        sel_rdata;
 type_scr1_mem_resp_e            sel_resp;
 logic                           sel_req_ack;
 
@@ -145,7 +146,8 @@ end
 always_comb begin
     case (port_sel_r)
         SCR1_SEL_PORT0  : begin
-            sel_rdata   = port0_rdata;
+            sel_rdata[0]= port0_rdata;
+				sel_rdata[15:1] = '0;
             sel_resp    = port0_resp;
         end
         SCR1_SEL_PORT1  : begin
@@ -153,7 +155,8 @@ always_comb begin
             sel_resp    = port1_resp;
         end
         SCR1_SEL_PORT2  : begin
-            sel_rdata   = port2_rdata;
+            sel_rdata[0]   = port2_rdata;
+				sel_rdata[15 : 1] = '0;
             sel_resp    = port2_resp;
         end
         default         : begin
@@ -190,9 +193,9 @@ always_comb begin
 end
 
 assign port0_cmd    = (port_sel == SCR1_SEL_PORT0) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port0_width  = (port_sel == SCR1_SEL_PORT0) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
+assign port0_width  = (port_sel == SCR1_SEL_PORT0) ? dmem_width : 'x;
 assign port0_addr   = (port_sel == SCR1_SEL_PORT0) ? dmem_addr  : 'x;
-assign port0_wdata  = (port_sel == SCR1_SEL_PORT0) ? dmem_wdata : 'x;
+assign port0_wdata  = (port_sel == SCR1_SEL_PORT0) ? dmem_wdata[0] : 'x;
 
 //-------------------------------------------------------------------------------
 // Interface to PORT1
@@ -214,7 +217,7 @@ always_comb begin
 end
 
 assign port1_cmd    = (port_sel == SCR1_SEL_PORT1) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port1_width  = (port_sel == SCR1_SEL_PORT1) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
+assign port1_width  = (port_sel == SCR1_SEL_PORT1) ? dmem_width : 'x;
 assign port1_addr   = (port_sel == SCR1_SEL_PORT1) ? dmem_addr  : 'x;
 assign port1_wdata  = (port_sel == SCR1_SEL_PORT1) ? dmem_wdata : 'x;
 
@@ -238,9 +241,9 @@ always_comb begin
 end
 
 assign port2_cmd    = (port_sel == SCR1_SEL_PORT2) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port2_width  = (port_sel == SCR1_SEL_PORT2) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
+assign port2_width  = (port_sel == SCR1_SEL_PORT2) ? dmem_width : 'x;
 assign port2_addr   = (port_sel == SCR1_SEL_PORT2) ? dmem_addr  : 'x;
-assign port2_wdata  = (port_sel == SCR1_SEL_PORT2) ? dmem_wdata : 'x;
+assign port2_wdata  = (port_sel == SCR1_SEL_PORT2) ? dmem_wdata[0] : 'x;
 
 `ifdef SCR1_SIM_ENV
 //-------------------------------------------------------------------------------

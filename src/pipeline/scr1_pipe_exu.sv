@@ -8,6 +8,7 @@
 `include "scr1_memif.svh"
 `include "scr1_riscv_isa_decoding.svh"
 `include "scr1_csr.svh"
+`include "defines.svh"
 
 `ifdef SCR1_DBGC_EN
  `include "scr1_dbgc.svh"
@@ -39,12 +40,15 @@ module scr1_pipe_exu (
 
     // EXU <-> MPRF interface
     output  logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rs1_addr,      // MPRF rs1 read address
-    input   logic [`SCR1_XLEN-1:0]              mprf2exu_rs1_data,      // MPRF rs1 read data
+    output  logic                               rs1_is_vector,          // MPRF rs1 is vector ?
+    input   type_vector                         mprf2exu_rs1_data,      // MPRF rs1 read data
     output  logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rs2_addr,      // MPRF rs2 read address
-    input   logic [`SCR1_XLEN-1:0]              mprf2exu_rs2_data,      // MPRF rs2 read data
+    output  logic                               rs2_is_vector,          // MPRF rs2 is vector ?
+    input   type_vector                         mprf2exu_rs2_data,      // MPRF rs2 read data
     output  logic                               exu2mprf_w_req,         // MPRF write request
     output  logic [`SCR1_MPRF_ADDR_WIDTH-1:0]   exu2mprf_rd_addr,       // MPRF rd write address
-    output  logic [`SCR1_XLEN-1:0]              exu2mprf_rd_data,       // MPRF rd write data
+    output  logic                               rd_is_vector,           // MPRF rd is vector ?
+    output   type_vector                        exu2mprf_rd_data,       // MPRF rd write data
 
     // EXU <-> CSR read/write interface
     output  logic [SCR1_CSR_ADDR_WIDTH-1:0]     exu2csr_rw_addr,        // CSR read/write address
@@ -72,9 +76,9 @@ module scr1_pipe_exu (
     output  type_scr1_mem_cmd_e                 exu2dmem_cmd,           // Data memory command
     output  type_scr1_mem_width_e               exu2dmem_width,         // Data memory width
     output  logic [`SCR1_DMEM_AWIDTH-1:0]       exu2dmem_addr,          // Data memory address
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]       exu2dmem_wdata,         // Data memory write data
+    output  type_vector						         exu2dmem_wdata,         // Data memory write data
     input   logic                               dmem2exu_req_ack,       // Data memory request acknowledge
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]       dmem2exu_rdata,         // Data memory read data
+    input   type_vector			   		         dmem2exu_rdata,         // Data memory read data
     input   type_scr1_mem_resp_e                dmem2exu_resp,          // Data memory response
 
     // EXU control
@@ -147,18 +151,18 @@ logic                           exu_rdy;
 logic                           ialu_rdy;
 logic                           ialu_vd;
 `endif // SCR1_RVM_EXT
-logic [`SCR1_XLEN-1:0]          ialu_op1;
-logic [`SCR1_XLEN-1:0]          ialu_op2;
+type_vector				           ialu_op1;
+type_vector          			  ialu_op2;
 logic [`SCR1_XLEN-1:0]          ialu_sum2_op1;
 logic [`SCR1_XLEN-1:0]          ialu_sum2_op2;
-logic [`SCR1_XLEN-1:0]          ialu_res;
+type_vector				           ialu_res;
 logic [`SCR1_XLEN-1:0]          ialu_sum2_res;
 logic                           ialu_cmp;
 
 // LSU signals
 logic                           lsu_req;
 logic                           lsu_rdy;
-logic [`SCR1_XLEN-1:0]          lsu_l_data;
+type_vector 			           lsu_l_data;
 logic                           lsu_exc;
 type_scr1_exc_code_e            lsu_exc_code;
 
@@ -296,11 +300,11 @@ always_comb begin
         ialu_op2 = mprf2exu_rs2_data;
     end else begin
         ialu_op1 = mprf2exu_rs1_data;
-        ialu_op2 = exu_queue.imm;
+        ialu_op2 = {`LANE{exu_queue.imm}};
     end
     // SUM2
     if (exu_queue.sum2_op == SCR1_SUM2_OP_REG_IMM) begin
-        ialu_sum2_op1 = mprf2exu_rs1_data;
+        ialu_sum2_op1 = mprf2exu_rs1_data[0];   // using the lane 0
         ialu_sum2_op2 = exu_queue.imm;
     end else begin
         ialu_sum2_op1 = curr_pc;
@@ -308,9 +312,12 @@ always_comb begin
     end
 end
 
-assign exu2mprf_rs1_addr    = `SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs1_addr);
-assign exu2mprf_rs2_addr    = `SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs2_addr);
+assign exu2mprf_rs1_addr    = {`LANE{`SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs1_addr)}};
+assign exu2mprf_rs2_addr    = {`LANE{`SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs2_addr)}};
 
+assign rs1_is_vector = exu_queue.rs1_is_vector; 
+assign rs2_is_vector = exu_queue.rs2_is_vector; 
+assign rd_is_vector = exu_queue.rd_is_vector; 
 
 //-------------------------------------------------------------------------------
 // Integer Arithmetic Logic Unit (IALU)
@@ -388,7 +395,7 @@ scr1_pipe_lsu i_lsu(
 //-------------------------------------------------------------------------------
 always_comb begin
     if (exu_queue.csr_op == SCR1_CSR_OP_REG) begin
-        exu2csr_w_data = mprf2exu_rs1_data;
+        exu2csr_w_data = mprf2exu_rs1_data[0];    //using the lane 0
     end else begin
         exu2csr_w_data = {'0, exu_queue.rs1_addr};    // zimm
     end
@@ -669,11 +676,11 @@ always_comb begin
                     & ((exu_queue.rd_wb_sel == SCR1_RD_WB_CSR) ? (csr_access == SCR1_CSR_INIT) : exu_rdy);
     exu2mprf_rd_addr = `SCR1_MPRF_ADDR_WIDTH'(exu_queue.rd_addr);
     case (exu_queue.rd_wb_sel)
-        SCR1_RD_WB_SUM2     : exu2mprf_rd_data = ialu_sum2_res;
-        SCR1_RD_WB_IMM      : exu2mprf_rd_data = exu_queue.imm;
-        SCR1_RD_WB_INC_PC   : exu2mprf_rd_data = inc_pc;
+        SCR1_RD_WB_SUM2     : exu2mprf_rd_data = {`LANE{ialu_sum2_res}};
+        SCR1_RD_WB_IMM      : exu2mprf_rd_data = {`LANE{exu_queue.imm}};
+        SCR1_RD_WB_INC_PC   : exu2mprf_rd_data = {`LANE{inc_pc}};
         SCR1_RD_WB_LSU      : exu2mprf_rd_data = lsu_l_data;
-        SCR1_RD_WB_CSR      : exu2mprf_rd_data = csr2exu_r_data;
+        SCR1_RD_WB_CSR      : exu2mprf_rd_data = {`LANE{csr2exu_r_data}};
         default             : exu2mprf_rd_data = ialu_res;      // IALU by default
     endcase
 end

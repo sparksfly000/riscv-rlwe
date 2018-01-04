@@ -101,6 +101,9 @@ always_comb begin
     idu2exu_cmd.imm         = '0;
     idu2exu_cmd.exc_req     = 1'b0;
     idu2exu_cmd.exc_code    = SCR1_EXC_CODE_INSTR_MISALIGN;
+	 idu2exu_cmd.rs1_is_vector= 1'b0;
+	 idu2exu_cmd.rs2_is_vector= 1'b0;
+	 idu2exu_cmd.rd_is_vector= 1'b0;
     // Clock gating
     idu2exu_use_rs1         = 1'b0;
     idu2exu_use_rs2         = 1'b0;
@@ -448,6 +451,68 @@ always_comb begin
                             default : rvi_illegal = 1'b1;
                         endcase // funct3
                     end // SCR1_OPCODE_SYSTEM
+
+                    SCR1_OPCODE_VALU           : begin
+                        idu2exu_use_rs1         = 1'b1;
+                        idu2exu_use_rs2         = 1'b1;
+                        idu2exu_use_rd          = 1'b1;
+                        idu2exu_cmd.rs1_is_vector   = 1'b1;
+                        idu2exu_cmd.rs2_is_vector   = 1'b1;
+                        idu2exu_cmd.rd_is_vector    = 1'b1;
+                        idu2exu_cmd.ialu_op     = SCR1_IALU_OP_REG_REG;
+                        idu2exu_cmd.rd_wb_sel   = SCR1_RD_WB_IALU;
+                        case (funct7)
+                            7'b0000000 : begin
+                                    idu2exu_cmd.ialu_cmd  = SCR1_IALU_CMD_ADD;
+                            end // 7'b0000000
+
+                            7'b0100000 : begin
+                                    idu2exu_cmd.ialu_cmd  = SCR1_IALU_CMD_SUB;
+                            end // 7'b0100000
+`ifdef SCR1_RVM_EXT
+                            7'b0000001 : begin
+                                    idu2exu_cmd.ialu_cmd  = SCR1_IALU_CMD_MUL;
+                            end // 7'b0000001
+`endif  // SCR1_RVM_EXT
+                            default : rvi_illegal = 1'b1;
+                        endcase // funct7
+`ifdef SCR1_RVE_EXT
+                        if (instr[11] | instr[19] | instr[24])  rve_illegal = 1'b1;
+`endif  // SCR1_RVE_EXT
+                    end // SCR1_OPCODE_VALU
+
+                    SCR1_OPCODE_VLOAD          : begin
+                        idu2exu_use_rs1         = 1'b1;
+                        idu2exu_use_rd          = 1'b1;
+                        idu2exu_use_imm         = 1'b1;
+								idu2exu_cmd.rs1_is_vector   = 1'b0;
+								idu2exu_cmd.rs2_is_vector   = 1'b0;
+								idu2exu_cmd.rd_is_vector    = 1'b1;
+                        idu2exu_cmd.sum2_op     = SCR1_SUM2_OP_REG_IMM;
+                        idu2exu_cmd.rd_wb_sel   = SCR1_RD_WB_LSU;
+                        idu2exu_cmd.imm         = {{21{instr[31]}}, instr[30:20]};
+                            
+                            idu2exu_cmd.lsu_cmd = SCR1_LSU_CMD_LV;
+`ifdef SCR1_RVE_EXT
+                        if (instr[11] | instr[19])  rve_illegal = 1'b1;
+`endif  // SCR1_RVE_EXT
+                    end // SCR1_OPCODE_VLOAD
+                   
+						 SCR1_OPCODE_VSTORE          : begin
+                        idu2exu_use_rs1         = 1'b1;
+                        idu2exu_use_rs2         = 1'b1;
+                        idu2exu_use_imm         = 1'b1;
+								idu2exu_cmd.rs1_is_vector   = 1'b0;
+								idu2exu_cmd.rs2_is_vector   = 1'b1;
+								idu2exu_cmd.rd_is_vector   = 1'b0;
+                        idu2exu_cmd.sum2_op     = SCR1_SUM2_OP_REG_IMM;
+                        idu2exu_cmd.imm         = {{21{instr[31]}}, instr[30:25], instr[11:7]};
+                            
+									idu2exu_cmd.lsu_cmd = SCR1_LSU_CMD_SV;
+`ifdef SCR1_RVE_EXT
+                        if (instr[19] | instr[24])  rve_illegal = 1'b1;
+`endif  // SCR1_RVE_EXT
+                    end // SCR1_OPCODE_VSTORE
 
                     default : begin
                         rvi_illegal = 1'b1;

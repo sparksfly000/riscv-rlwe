@@ -4,6 +4,7 @@
 ///
 
 `include "scr1_arch_description.svh"
+`include "defines.svh"
 
 `ifdef NTTSIM
 `include "NTTsrc/defines.sv"
@@ -25,9 +26,10 @@ module scr1_dp_memory
     input   logic                           renb,
     input   logic                           wenb,
     input   logic [SCR1_NBYTES-1:0]         webb,
+	 input   logic                           w_is_vector,
     input   logic [$clog2(SCR1_SIZE)-1:2]   addrb,
-    input   logic [SCR1_WIDTH-1:0]          datab,
-    output  logic [SCR1_WIDTH-1:0]          qb
+    input   type_vector 			           datab,
+    output  type_vector			              qb
 );
 
 `ifdef NTTSIM
@@ -105,14 +107,22 @@ always_ff @(posedge clk) begin
 			ram_block[513] <= 32'hffffffff;   // can't work? why?
 `endif
     if (wenb) begin
+		  if(w_is_vector) begin
+		  for(int i =0; i< `LANE ; i++)
+				ram_block[addrb + i] <= datab[i];
+		  end
+		  else begin
         for (int i=0; i<SCR1_NBYTES; i++) begin
             if (webb[i]) begin
-                ram_block[addrb][i*8 +: 8] <= datab[i*8 +: 8];
+                ram_block[addrb][i*8 +: 8] <= datab[0][i*8 +: 8];
             end
         end
-    end
+   	 end 
+	end
     if (renb) begin
-        qb <= ram_block[addrb];
+		  for(int i =0; i< `LANE ; i++) begin
+        		qb[i] <= ram_block[addrb + i];
+		  end
     end
 end
 

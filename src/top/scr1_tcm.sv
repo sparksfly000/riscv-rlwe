@@ -4,6 +4,7 @@
 ///
 `include "scr1_memif.svh"
 `include "scr1_arch_description.svh"
+`include "defines.svh"
 
 module scr1_tcm
 #(
@@ -28,8 +29,8 @@ module scr1_tcm
     input   type_scr1_mem_cmd_e             dmem_cmd,
     input   type_scr1_mem_width_e           dmem_width,
     input   logic [`SCR1_DMEM_AWIDTH-1:0]   dmem_addr,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]   dmem_wdata,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]   dmem_rdata,
+    input   type_vector						     dmem_wdata,
+    output  type_vector						     dmem_rdata,
     output  type_scr1_mem_resp_e            dmem_resp
 );
 
@@ -41,10 +42,11 @@ logic                               dmem_req_en;
 logic                               imem_rd;
 logic                               dmem_rd;
 logic                               dmem_wr;
-logic [`SCR1_DMEM_DWIDTH-1:0]       dmem_writedata;
-logic [`SCR1_DMEM_DWIDTH-1:0]       dmem_rdata_local;
+type_vector						         dmem_writedata;
+type_vector						         dmem_rdata_local;
 logic [3:0]                         dmem_byteen;
 logic [1:0]                         dmem_rdata_shift_reg;
+logic                               w_is_vector;
 //-------------------------------------------------------------------------------
 // Core interface
 //-------------------------------------------------------------------------------
@@ -79,14 +81,22 @@ assign dmem_wr  = dmem_req & (dmem_cmd == SCR1_MEM_CMD_WR);
 always_comb begin
     dmem_writedata = dmem_wdata;
     dmem_byteen    = 4'b1111;
+	 w_is_vector    = 1'b1;
     case ( dmem_width )
         SCR1_MEM_WIDTH_BYTE : begin
-            dmem_writedata  = {(`SCR1_DMEM_DWIDTH /  8){dmem_wdata[7:0]}};
+            dmem_writedata  = {(`LANE*`SCR1_DMEM_DWIDTH /  8){dmem_wdata[0][7:0]}};
             dmem_byteen     = 1'b1 << dmem_addr[1:0];
+	 			w_is_vector     = 1'b0;
         end
         SCR1_MEM_WIDTH_HWORD : begin
-            dmem_writedata  = {(`SCR1_DMEM_DWIDTH / 16){dmem_wdata[15:0]}};
+            dmem_writedata  = {(`LANE*`SCR1_DMEM_DWIDTH / 16){dmem_wdata[0][15:0]}};
             dmem_byteen     = 2'b11 << {dmem_addr[1], 1'b0};
+	 			w_is_vector     = 1'b0;
+        end
+        SCR1_MEM_WIDTH_WORD : begin
+            dmem_writedata  = {(`LANE*`SCR1_DMEM_DWIDTH / 32){dmem_wdata[0][31:0]}};
+            dmem_byteen     = 4'b1111;
+	 			w_is_vector     = 1'b0;
         end
         default : begin
         end
@@ -110,6 +120,7 @@ scr1_dp_memory #(
     .renb   ( dmem_rd                               ),
     .wenb   ( dmem_wr                               ),
     .webb   ( dmem_byteen                           ),
+	 .w_is_vector(w_is_vector                        ),
     .addrb  ( dmem_addr[$clog2(SCR1_TCM_SIZE)-1:2]  ),
     .qb     ( dmem_rdata_local                      ),
     .datab  ( dmem_writedata                        )
@@ -123,6 +134,7 @@ always_ff @(posedge clk) begin
     end
 end
 
-assign dmem_rdata = dmem_rdata_local >> ( 8 * dmem_rdata_shift_reg );
+assign dmem_rdata[0] = dmem_rdata_local[0] >> ( 8 * dmem_rdata_shift_reg );
+assign dmem_rdata[15:1] = dmem_rdata_local[15:1];
 
 endmodule : scr1_tcm

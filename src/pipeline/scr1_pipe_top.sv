@@ -7,6 +7,7 @@
 `include "scr1_memif.svh"
 `include "scr1_riscv_isa_decoding.svh"
 `include "scr1_csr.svh"
+`include "defines.svh"
 
 `ifdef SCR1_IPIC_EN
 `include "scr1_ipic.svh"
@@ -38,9 +39,9 @@ module scr1_pipe_top (
     output  type_scr1_mem_cmd_e                         dmem_cmd,
     output  type_scr1_mem_width_e                       dmem_width,
     output  logic [`SCR1_DMEM_AWIDTH-1:0]               dmem_addr,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]               dmem_wdata,
+    output  type_vector						                 dmem_wdata,
     input   logic                                       dmem_req_ack,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]               dmem_rdata,
+    input   type_vector						                 dmem_rdata,
     input   type_scr1_mem_resp_e                        dmem_resp,
 
 `ifdef SCR1_DBGC_EN
@@ -138,12 +139,15 @@ logic                                       exu2idu_rdy;            // EXU ready
 
 // EXU <-> MPRF
 logic [`SCR1_MPRF_ADDR_WIDTH-1:0]           exu2mprf_rs1_addr;      // MPRF rs1 read address
-logic [`SCR1_XLEN-1:0]                      mprf2exu_rs1_data;      // MPRF rs1 read data
+logic                                       rs1_is_vector;
+type_vector                                 mprf2exu_rs1_data;      // MPRF rs1 read data
 logic [`SCR1_MPRF_ADDR_WIDTH-1:0]           exu2mprf_rs2_addr;      // MPRF rs2 read address
-logic [`SCR1_XLEN-1:0]                      mprf2exu_rs2_data;      // MPRF rs2 read data
+logic                                       rs2_is_vector;
+type_vector                                 mprf2exu_rs2_data;      // MPRF rs2 read data
 logic                                       exu2mprf_w_req;         // MPRF write request
 logic [`SCR1_MPRF_ADDR_WIDTH-1:0]           exu2mprf_rd_addr;       // MPRF rd write address
-logic [`SCR1_XLEN-1:0]                      exu2mprf_rd_data;       // MPRF rd write data
+logic                                       rd_is_vector;
+type_vector                                 exu2mprf_rd_data;       // MPRF rd write data
 
 // EXU <-> CSR
 logic [SCR1_CSR_ADDR_WIDTH-1:0]             exu2csr_rw_addr;        // CSR read/write address
@@ -328,11 +332,14 @@ scr1_pipe_exu i_pipe_exu (
 `endif // SCR1_EXU_STAGE_BYPASS
 
     .exu2mprf_rs1_addr      (exu2mprf_rs1_addr    ),
+	 .rs1_is_vector          (rs1_is_vector        ),
     .mprf2exu_rs1_data      (mprf2exu_rs1_data    ),
     .exu2mprf_rs2_addr      (exu2mprf_rs2_addr    ),
+	 .rs2_is_vector          (rs2_is_vector        ),
     .mprf2exu_rs2_data      (mprf2exu_rs2_data    ),
     .exu2mprf_w_req         (exu2mprf_w_req       ),
     .exu2mprf_rd_addr       (exu2mprf_rd_addr     ),
+	 .rd_is_vector           (rd_is_vector         ),
     .exu2mprf_rd_data       (exu2mprf_rd_data     ),
 
     .exu2csr_rw_addr        (exu2csr_rw_addr      ),
@@ -410,11 +417,14 @@ scr1_pipe_mprf i_pipe_mprf (
     .rst_n                  (rst_n            ),
     .clk                    (clk              ),
     .exu2mprf_rs1_addr      (exu2mprf_rs1_addr),
-    .mprf2exu_rs1_data      (mprf2exu_rs1_data),
+    .rs1_is_vector          (rs1_is_vector    ),
+	 .mprf2exu_rs1_data      (mprf2exu_rs1_data),
     .exu2mprf_rs2_addr      (exu2mprf_rs2_addr),
+    .rs2_is_vector          (rs2_is_vector    ),
     .mprf2exu_rs2_data      (mprf2exu_rs2_data),
     .exu2mprf_w_req         (exu2mprf_w_req   ),
     .exu2mprf_rd_addr       (exu2mprf_rd_addr ),
+    .rd_is_vector           (rd_is_vector     ),
     .exu2mprf_rd_data       (exu2mprf_rd_data )
 );
 
@@ -596,8 +606,10 @@ scr1_tracelog i_tracelog (
     .fuse_mhartid   (fuse_mhartid                       ),
     // MPRF
     .mprf_int       (i_pipe_mprf.mprf_int               ),
+    .mprf_vector    (i_pipe_mprf.mprf_vector            ),
     .mprf_wr_en     (i_pipe_mprf.exu2mprf_w_req         ),
     .mprf_wr_addr   (i_pipe_mprf.exu2mprf_rd_addr       ),
+    .wr_is_vector   (i_pipe_mprf.rd_is_vector           ),
     .mprf_wr_data   (i_pipe_mprf.exu2mprf_rd_data       ),
     // EXU
     .update_pc_en   (i_pipe_exu.update_pc_en            ),

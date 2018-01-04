@@ -6,7 +6,7 @@
 `include "scr1_arch_description.svh"
 `include "scr1_arch_types.svh"
 `include "scr1_csr.svh"
-
+`include "defines.svh"
 module scr1_tracelog (
     input   logic                                   rst_n,
     input   logic                                   clk,
@@ -14,12 +14,15 @@ module scr1_tracelog (
     // MPRF
 `ifndef SCR1_RVE_EXT
     input   type_scr1_mprf_v [1:31]                 mprf_int,
+	 input   type_vector [1:31]                      mprf_vector,
 `else // SCR1_RVE_EXT
     input   type_scr1_mprf_v [1:15]                 mprf_int,
+	 input   type_vector										 mprf_vector,
 `endif // SCR1_RVE_EXT
     input   logic                                   mprf_wr_en,
     input   logic [`SCR1_MPRF_ADDR_WIDTH-1:0]       mprf_wr_addr,
-    input   logic [`SCR1_XLEN-1:0]                  mprf_wr_data,
+	 input   logic                                   wr_is_vector,
+    input   type_vector				                   mprf_wr_data,
     // EXU
     input   logic                                   update_pc_en,
     input   logic [`SCR1_XLEN-1:0]                  update_pc,
@@ -85,6 +88,45 @@ typedef struct {
 `endif // SCR1_RVE_EXT
 } type_scr1_ireg_name_s;
 
+typedef struct{
+	type_vector VECTOR_00;
+	type_vector VECTOR_01;
+	type_vector VECTOR_02;
+	type_vector VECTOR_03;
+	type_vector VECTOR_04;
+	type_vector VECTOR_05;
+	type_vector VECTOR_06;
+	type_vector VECTOR_07;
+	type_vector VECTOR_08;
+	type_vector VECTOR_09;
+	type_vector VECTOR_10;
+	type_vector VECTOR_11;
+	type_vector VECTOR_12;
+	type_vector VECTOR_13;
+	type_vector VECTOR_14;
+	type_vector VECTOR_15;
+
+`ifndef SCR1_RVE_EXT
+	
+	type_vector VECTOR_16;
+	type_vector VECTOR_17;
+	type_vector VECTOR_18;
+	type_vector VECTOR_19;
+	type_vector VECTOR_20;
+	type_vector VECTOR_21;
+	type_vector VECTOR_22;
+	type_vector VECTOR_23;
+	type_vector VECTOR_24;
+	type_vector VECTOR_25;
+	type_vector VECTOR_26;
+	type_vector VECTOR_27;
+	type_vector VECTOR_28;
+	type_vector VECTOR_29;
+	type_vector VECTOR_30;
+	type_vector VECTOR_31;
+`endif
+} type_vector_name_s;
+
 type_scr1_ireg_name_s   mprf_int_alias;
 
 assign mprf_int_alias.INT_00_ZERO   = '0;
@@ -122,6 +164,43 @@ assign mprf_int_alias.INT_30_T5     = mprf_int[30];
 assign mprf_int_alias.INT_31_T6     = mprf_int[31];
 `endif // SCR1_RVE_EXT
 
+
+type_vector_name_s mprf_vector_alias;
+
+assign mprf_vector_alias.VECTOR_00 = '0;
+assign mprf_vector_alias.VECTOR_01 = mprf_vector[1];
+assign mprf_vector_alias.VECTOR_02 = mprf_vector[2];
+assign mprf_vector_alias.VECTOR_03 = mprf_vector[3];
+assign mprf_vector_alias.VECTOR_04 = mprf_vector[4];
+assign mprf_vector_alias.VECTOR_05 = mprf_vector[5];
+assign mprf_vector_alias.VECTOR_06 = mprf_vector[6];
+assign mprf_vector_alias.VECTOR_07 = mprf_vector[7];
+assign mprf_vector_alias.VECTOR_08 = mprf_vector[8];
+assign mprf_vector_alias.VECTOR_09 = mprf_vector[9];
+assign mprf_vector_alias.VECTOR_10 = mprf_vector[10];
+assign mprf_vector_alias.VECTOR_11 = mprf_vector[11];
+assign mprf_vector_alias.VECTOR_12 = mprf_vector[12];
+assign mprf_vector_alias.VECTOR_13 = mprf_vector[13];
+assign mprf_vector_alias.VECTOR_14 = mprf_vector[14];
+assign mprf_vector_alias.VECTOR_15 = mprf_vector[15];
+`ifndef SCR_RVE_EXT
+assign mprf_vector_alias.VECTOR_16 = mprf_vector[16];
+assign mprf_vector_alias.VECTOR_17 = mprf_vector[17];
+assign mprf_vector_alias.VECTOR_18 = mprf_vector[18];
+assign mprf_vector_alias.VECTOR_19 = mprf_vector[19];
+assign mprf_vector_alias.VECTOR_20 = mprf_vector[20];
+assign mprf_vector_alias.VECTOR_21 = mprf_vector[21];
+assign mprf_vector_alias.VECTOR_22 = mprf_vector[22];
+assign mprf_vector_alias.VECTOR_23 = mprf_vector[23];
+assign mprf_vector_alias.VECTOR_24 = mprf_vector[24];
+assign mprf_vector_alias.VECTOR_25 = mprf_vector[25];
+assign mprf_vector_alias.VECTOR_26 = mprf_vector[26];
+assign mprf_vector_alias.VECTOR_27 = mprf_vector[27];
+assign mprf_vector_alias.VECTOR_28 = mprf_vector[28];
+assign mprf_vector_alias.VECTOR_29 = mprf_vector[29];
+assign mprf_vector_alias.VECTOR_30 = mprf_vector[30];
+assign mprf_vector_alias.VECTOR_31 = mprf_vector[31];
+`endif
 //-------------------------------------------------------------------------------
 // Time counter
 //-------------------------------------------------------------------------------
@@ -184,7 +263,7 @@ always_ff @(negedge rst_n, posedge clk) begin
             mprf_up     <= 1'b1;
             mprf_addr   <= mprf_wr_addr;
             if (mprf_wr_addr != 0) begin
-                mprf_int_log[$unsigned(mprf_wr_addr)] <= mprf_wr_data;
+                mprf_int_log[$unsigned(mprf_wr_addr)] <= mprf_wr_data[0];
             end
         end
     end

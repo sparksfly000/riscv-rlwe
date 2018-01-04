@@ -7,10 +7,12 @@
 `include "scr1_arch_types.svh"
 `include "scr1_memif.svh"
 `include "scr1_riscv_isa_decoding.svh"
+`include "defines.svh"
 `ifdef SCR1_BRKM_EN
 `include "scr1_brkm.svh"
 `endif // SCR1_BRKM_EN
 
+localparam  lane_sub_one=`LANE-1;
 module scr1_pipe_lsu (
     // Common
     input   logic                               rst_n,
@@ -20,9 +22,9 @@ module scr1_pipe_lsu (
     input   logic                               exu2lsu_req,            // Request to LSU
     input   type_scr1_lsu_cmd_sel_e             exu2lsu_cmd,            // LSU command
     input   logic [`SCR1_XLEN-1:0]              exu2lsu_addr,           // Address of DMEM
-    input   logic [`SCR1_XLEN-1:0]              exu2lsu_s_data,         // Data for store
+    input   type_vector				               exu2lsu_s_data,         // Data for store
     output  logic                               lsu2exu_rdy,            // LSU received DMEM response
-    output  logic [`SCR1_XLEN-1:0]              lsu2exu_l_data,         // Load data
+    output  type_vector				               lsu2exu_l_data,         // Load data
     output  logic                               lsu2exu_exc,            // Exception from LSU
     output  type_scr1_exc_code_e                lsu2exu_exc_code,       // Exception code
     output  logic                               lsu_busy,
@@ -39,9 +41,9 @@ module scr1_pipe_lsu (
     output  type_scr1_mem_cmd_e                 lsu2dmem_cmd,
     output  type_scr1_mem_width_e               lsu2dmem_width,
     output  logic [`SCR1_DMEM_AWIDTH-1:0]       lsu2dmem_addr,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]       lsu2dmem_wdata,
+    output  type_vector						         lsu2dmem_wdata,
     input   logic                               dmem2lsu_req_ack,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]       dmem2lsu_rdata,
+    input   type_vector						         dmem2lsu_rdata,
     input   type_scr1_mem_resp_e                dmem2lsu_resp
 );
 
@@ -108,8 +110,10 @@ always_comb begin
             SCR1_LSU_CMD_LH,
             SCR1_LSU_CMD_LHU    : l_misalign = exu2lsu_addr[0];
             SCR1_LSU_CMD_LW     : l_misalign = |exu2lsu_addr[1:0];
+            SCR1_LSU_CMD_LV     : l_misalign = |exu2lsu_addr[$clog2(`LANE) + 1:0];
             SCR1_LSU_CMD_SH     : s_misalign = exu2lsu_addr[0];
             SCR1_LSU_CMD_SW     : s_misalign = |exu2lsu_addr[1:0];
+            SCR1_LSU_CMD_SV     : s_misalign = |exu2lsu_addr[$clog2(`LANE) + 1:0];
             default : begin end
         endcase // exu2lsu_cmd
     end
@@ -135,11 +139,13 @@ always_comb begin
                 SCR1_LSU_CMD_LB,
                 SCR1_LSU_CMD_LH,
                 SCR1_LSU_CMD_LW,
+                SCR1_LSU_CMD_LV,
                 SCR1_LSU_CMD_LBU,
                 SCR1_LSU_CMD_LHU    : lsu2exu_exc_code = SCR1_EXC_CODE_LD_ACCESS_FAULT;
                 SCR1_LSU_CMD_SB,
                 SCR1_LSU_CMD_SH,
-                SCR1_LSU_CMD_SW     : lsu2exu_exc_code = SCR1_EXC_CODE_ST_ACCESS_FAULT;
+                SCR1_LSU_CMD_SW,
+                SCR1_LSU_CMD_SV     : lsu2exu_exc_code = SCR1_EXC_CODE_ST_ACCESS_FAULT;
                 // Impossible
                 default             : lsu2exu_exc_code = SCR1_EXC_CODE_INSTR_MISALIGN;
             endcase
@@ -158,12 +164,23 @@ end
 //-------------------------------------------------------------------------------
 always_comb begin
     case (lsu_cmd_r)
-        SCR1_LSU_CMD_LW     : lsu2exu_l_data = dmem2lsu_rdata;
-        SCR1_LSU_CMD_LH     : lsu2exu_l_data = signed'  (dmem2lsu_rdata[15:0]);
-        SCR1_LSU_CMD_LHU    : lsu2exu_l_data = unsigned'(dmem2lsu_rdata[15:0]);
-        SCR1_LSU_CMD_LB     : lsu2exu_l_data = signed'  (dmem2lsu_rdata[7:0]);
-        SCR1_LSU_CMD_LBU    : lsu2exu_l_data = unsigned'(dmem2lsu_rdata[7:0]);
-        default             : lsu2exu_l_data = '0;
+        SCR1_LSU_CMD_LV     : lsu2exu_l_data = dmem2lsu_rdata;
+        SCR1_LSU_CMD_LW     : begin lsu2exu_l_data[0] = dmem2lsu_rdata[0];
+												lsu2exu_l_data[15:1] = '0;
+										end
+        SCR1_LSU_CMD_LH     : begin lsu2exu_l_data[0] = signed'(dmem2lsu_rdata[0][15:0]);
+												lsu2exu_l_data[15:1] = '0;
+										end
+        SCR1_LSU_CMD_LHU    : begin lsu2exu_l_data[0] = unsigned'(dmem2lsu_rdata[0][15:0]);
+												lsu2exu_l_data[15:1] = '0;
+										end
+        SCR1_LSU_CMD_LB     : begin lsu2exu_l_data[0] =  signed'  (dmem2lsu_rdata[0][7:0]);
+												lsu2exu_l_data[15:1] = '0;
+										end
+		  SCR1_LSU_CMD_LBU    : begin lsu2exu_l_data[0] =  unsigned'(dmem2lsu_rdata[0][7:0]);
+												lsu2exu_l_data[15:1] = '0;
+										end
+		  default             : lsu2exu_l_data = '0;
     endcase // lsu_cmd_r
 end
 
@@ -190,6 +207,10 @@ always_comb begin
             lsu2dmem_cmd    = SCR1_MEM_CMD_RD;
             lsu2dmem_width  = SCR1_MEM_WIDTH_WORD;
         end
+        SCR1_LSU_CMD_LV     : begin
+            lsu2dmem_cmd    = SCR1_MEM_CMD_RD;
+            lsu2dmem_width  = SCR1_MEM_WIDTH_VECTOR;
+        end
         SCR1_LSU_CMD_SB     : begin
             lsu2dmem_cmd    = SCR1_MEM_CMD_WR;
             lsu2dmem_width  = SCR1_MEM_WIDTH_BYTE;
@@ -201,6 +222,10 @@ always_comb begin
         SCR1_LSU_CMD_SW     : begin
             lsu2dmem_cmd    = SCR1_MEM_CMD_WR;
             lsu2dmem_width  = SCR1_MEM_WIDTH_WORD;
+        end
+        SCR1_LSU_CMD_SV     : begin
+            lsu2dmem_cmd    = SCR1_MEM_CMD_WR;
+            lsu2dmem_width  = SCR1_MEM_WIDTH_VECTOR;
         end
         default             : begin
             lsu2dmem_cmd    = SCR1_MEM_CMD_RD;

@@ -6,6 +6,7 @@
 `include "scr1_arch_description.svh"
 `include "scr1_arch_types.svh"
 `include "scr1_memif.svh"
+`include "defines.svh"
 
 `ifdef SCR1_DBGC_EN
 `include "scr1_tapc.svh"
@@ -62,8 +63,8 @@ module scr1_core_top (
     output  type_scr1_mem_cmd_e                     dmem_cmd,
     output  type_scr1_mem_width_e                   dmem_width,
     output  logic [`SCR1_DMEM_AWIDTH-1:0]           dmem_addr,
-    output  logic [`SCR1_DMEM_DWIDTH-1:0]           dmem_wdata,
-    input   logic [`SCR1_DMEM_DWIDTH-1:0]           dmem_rdata,
+    output  type_vector						             dmem_wdata,
+    input   type_vector						             dmem_rdata,
     input   type_scr1_mem_resp_e                    dmem_resp
 );
 
@@ -198,9 +199,9 @@ scr1_pipe_top i_pipe_top (
     .dmem_cmd               (dmem_cmd           ),
     .dmem_width             (dmem_width         ),
     .dmem_addr              (dmem_addr          ),
-    .dmem_wdata             (dmem_wdata         ),
+    .dmem_wdata             (dmem_wdata		   ),
     .dmem_req_ack           (dmem_req_ack       ),
-    .dmem_rdata             (dmem_rdata         ),
+    .dmem_rdata             (dmem_rdata		   ),
     .dmem_resp              (dmem_resp          ),
 `ifdef SCR1_DBGC_EN
     // Debug interface
