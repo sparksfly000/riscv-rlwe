@@ -159,6 +159,10 @@ type_vector						                         core_dmem_wdata;
 type_vector						                         core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
 
+// Coprosser FIFO Interface 
+type_micro_instr_s                                  core_co_instr;
+
+
 // Instruction memory interface from router to AXI bridge
 logic                                               axi_imem_req_ack;
 logic                                               axi_imem_req;
@@ -214,6 +218,15 @@ logic                                               axi_reinit;
 logic                                               axi_imem_idle;
 logic                                               axi_dmem_idle;
 
+// FIFO to rlwe core instr memory interface
+localparam FIFO_DATA_WIDTH = 64;
+logic                                               full;
+logic                                               almost_full;
+logic                                               empty;
+logic                                               almost_empty;
+logic                                               dequeue_en;
+logic [FIFO_DATA_WIDTH - 1 : 0]                     value_o;
+
 //-------------------------------------------------------------------------------
 // SCR1 core instance
 //-------------------------------------------------------------------------------
@@ -249,6 +262,7 @@ scr1_core_top i_core_top (
     .imem_addr      (core_imem_addr     ),
     .imem_rdata     (core_imem_rdata    ),
     .imem_resp      (core_imem_resp     ),
+	 .pipe2core_instr(core_co_instr      ),
     // Data memory interface
     .dmem_req_ack   (core_dmem_req_ack  ),
     .dmem_req       (core_dmem_req      ),
@@ -259,6 +273,45 @@ scr1_core_top i_core_top (
     .dmem_rdata     (core_dmem_rdata    ),
     .dmem_resp      (core_dmem_resp     )
 );
+//--------------------------------------------------------
+// coproessor FIFO
+//--------------------------------------------------------
+
+sync_fifo #(.WIDTH (FIFO_DATA_WIDTH)) 
+		i_sync_fifo
+    (.clk          (clk                 ),
+     .rst_n        (rst_n               ),
+     .flush_en     (1'b0                ),    // flush is synchronous, unlike reset
+     .full         (ful                 ),
+     .almost_full  ( almost_full        ),
+     .enqueue_en   (core_co_instr.micro_valid),
+     .value_i      (core_co_instr.micro_op),
+     .empty        (empty                 ),
+     .almost_empty (almost_empty          ),
+     .dequeue_en   (dequeue_en            ),
+     .value_o      (value_o               )
+);
+
+//--------------------------------------------------------
+// rlwe core 
+//--------------------------------------------------------
+
+
+rlwecore #(.WIDTH(FIFO_DATA_WIDTH))
+		i_rlwecore	
+		(
+		.clk(clk),
+		.rst_n(rst_n),
+	
+		// FIFO Interface
+     .full		     (full             ),
+     .almost_full   (almost_full      ),
+     .empty         (empty            ),
+     .almost_empty  (almost_empty     ),
+     .dequeue_en    (dequeue_en       ),
+     .value_o       (value_o          ));		
+
+
 
 
 `ifdef SCR1_TCM_EN

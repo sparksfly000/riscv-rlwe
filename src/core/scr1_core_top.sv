@@ -57,6 +57,9 @@ module scr1_core_top (
     input   logic [`SCR1_IMEM_DWIDTH-1:0]           imem_rdata,
     input   type_scr1_mem_resp_e                    imem_resp,
 
+	// Coprosser FIFO Interface 
+	 output  type_micro_instr_s                      pipe2core_instr,
+
     // Data Memory Interface
     input   logic                                   dmem_req_ack,
     output  logic                                   dmem_req,
@@ -203,6 +206,10 @@ scr1_pipe_top i_pipe_top (
     .dmem_req_ack           (dmem_req_ack       ),
     .dmem_rdata             (dmem_rdata		   ),
     .dmem_resp              (dmem_resp          ),
+
+     // Copressor Micro Instruction Interface
+	  .idu2Co_instr          (pipe2core_instr    ),
+
 `ifdef SCR1_DBGC_EN
     // Debug interface
     .dbgc_hart_cmd          (dbgc_hart_cmd      ),

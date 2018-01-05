@@ -25,12 +25,13 @@ module scr1_pipe_idu
     // IDU <-> EXU interface
     output  logic                           idu2exu_req,            // IDU request
     output  type_scr1_exu_cmd_s             idu2exu_cmd,            // IDU command
+    output  type_micro_instr_s              idu2Co_instr,          // MICRO instr
     output  logic                           idu2exu_use_rs1,        // Instruction uses rs1
     output  logic                           idu2exu_use_rs2,        // Instruction uses rs2
     output  logic                           idu2exu_use_rd,         // Instruction uses rd
     output  logic                           idu2exu_use_imm,        // Instruction uses immediate
     input   logic                           exu2idu_rdy,            // EXU ready for new data
-
+    
     output  logic                           idu_busy                // IDU busy
 );
 
@@ -104,6 +105,9 @@ always_comb begin
 	 idu2exu_cmd.rs1_is_vector= 1'b0;
 	 idu2exu_cmd.rs2_is_vector= 1'b0;
 	 idu2exu_cmd.rd_is_vector= 1'b0;
+	 // micro 
+	 idu2Co_instr.micro_op   = MICRO_NONE; 
+    idu2Co_instr.micro_valid= 1'b0;
     // Clock gating
     idu2exu_use_rs1         = 1'b0;
     idu2exu_use_rs2         = 1'b0;
@@ -513,7 +517,23 @@ always_comb begin
                         if (instr[19] | instr[24])  rve_illegal = 1'b1;
 `endif  // SCR1_RVE_EXT
                     end // SCR1_OPCODE_VSTORE
+							  
+                    SCR1_OPCODE_MICRO          : begin
+								idu2Co_instr.micro_valid = 1'b1;
+                                case (funct3)
+                                    3'b000  : idu2Co_instr.micro_op  = MICRO_NTT;
+                                    3'b001  : idu2Co_instr.micro_op  = MICRO_INTT;
+                                    3'b010  : idu2Co_instr.micro_op  = MICRO_SAMPLE;
+                                    3'b011  : idu2Co_instr.micro_op  = MICRO_PAIRWISE_ADD;
+                                    3'b100  : idu2Co_instr.micro_op  = MICRO_PAIRWISE_SUB;
+                                    3'b101  : idu2Co_instr.micro_op  = MICRO_PAIRWISE_MUL;
+                                    default : idu2Co_instr.micro_op  = MICRO_NONE;
+										endcase // funct3
 
+`ifdef SCR1_RVE_EXT
+                        if (instr[11] | instr[19] | instr[24])  rve_illegal = 1'b1;
+`endif  // SCR1_RVE_EXT
+                    end // SCR1_OPCODE_MICRO
                     default : begin
                         rvi_illegal = 1'b1;
                     end

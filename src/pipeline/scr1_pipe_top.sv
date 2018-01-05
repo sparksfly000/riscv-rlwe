@@ -44,6 +44,9 @@ module scr1_pipe_top (
     input   type_vector						                 dmem_rdata,
     input   type_scr1_mem_resp_e                        dmem_resp,
 
+     // Copressor Micro Instruction Interface
+	 output  type_micro_instr_s                          idu2Co_instr,           // MICRO instr (see scr1_riscv_isa_decoding.svh)
+
 `ifdef SCR1_DBGC_EN
     // DBGC interface
     input   type_scr1_dbgc_hart_dbg_mode_e              dbgc_hart_cmd,
@@ -295,6 +298,7 @@ scr1_pipe_idu i_pipe_idu (
 
     .idu2exu_req        (idu2exu_req        ),
     .idu2exu_cmd        (idu2exu_cmd        ),
+	 .idu2Co_instr       (idu2Co_instr       ),
 `ifndef SCR1_EXU_STAGE_BYPASS
     .idu2exu_use_rs1    (idu2exu_use_rs1    ),
     .idu2exu_use_rs2    (idu2exu_use_rs2    ),

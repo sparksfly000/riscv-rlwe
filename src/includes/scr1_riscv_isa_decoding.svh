@@ -35,7 +35,8 @@ typedef enum logic [6:2] {
     SCR1_OPCODE_SYSTEM      = 5'b11100,
 	 SCR1_OPCODE_VALU        = 5'b00010,
 	 SCR1_OPCODE_VLOAD       = 5'b11101,
-	 SCR1_OPCODE_VSTORE      = 5'b11110
+	 SCR1_OPCODE_VSTORE      = 5'b11110,
+	 SCR1_OPCODE_MICRO       = 5'b11010
 } type_scr1_rvi_opcode_e;
 
 
@@ -184,6 +185,31 @@ typedef struct packed {
 	 logic                               rs2_is_vector;     // is vector operation?
 	 logic                               rd_is_vector;     // is vector operation?
 } type_scr1_exu_cmd_s;
+
+
+
+//-------------------------------------------------------------------------------
+// IDU to Coprocessor  FIFO structure
+//-------------------------------------------------------------------------------
+
+localparam SCR1_MICRO_OP_NUM_E = 7;
+localparam SCR1_MICRO_OP_WIDTH_E   = $clog2(SCR1_MICRO_OP_NUM_E);
+
+typedef enum logic [SCR1_MICRO_OP_WIDTH_E - 1 : 0] {
+	MICRO_NONE ='0 ,
+	MICRO_NTT ,
+	MICRO_INTT,
+	MICRO_SAMPLE,
+	MICRO_PAIRWISE_ADD,
+   MICRO_PAIRWISE_SUB,
+   MICRO_PAIRWISE_MUL
+
+}type_micro_sel_e;
+
+typedef struct packed {
+	type_micro_sel_e micro_op;	
+   logic            micro_valid;
+}type_micro_instr_s;
 
 `endif // SCR1_RISCV_ISA_DECODING_SVH
 
