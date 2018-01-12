@@ -99,8 +99,11 @@ module sram_1r1w
     // Simulation
     logic[DATA_WIDTH - 1:0] data[SIZE];
 
+
+
     always_ff @(posedge clk)
     begin
+	 //	  $readmemh("./testcases/rlwe-test.hex",data);
         if (write_en)
             data[write_addr] <= write_data;
 

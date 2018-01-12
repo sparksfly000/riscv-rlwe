@@ -33,7 +33,7 @@
 
 module sync_fifo
     #(parameter WIDTH = 64,
-    parameter SIZE = 4,
+    parameter SIZE = 8,
     parameter ALMOST_FULL_THRESHOLD = SIZE,
     parameter ALMOST_EMPTY_THRESHOLD = 1)
 

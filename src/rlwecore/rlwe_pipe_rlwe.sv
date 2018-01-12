@@ -12,7 +12,7 @@
 `include "scr1_brkm.svh"
 `endif // SCR1_BRKM_EN
 
-module scr1_pipe_lsu (
+module rlwe_pipe_rlwe (
     // Common
     input   logic                               rst_n,
     input   logic                               clk,
@@ -49,7 +49,6 @@ module scr1_pipe_lsu (
 
 
 localparam  lane_sub_one=`LANE-1;
-
 //-------------------------------------------------------------------------------
 // Local types declaration
 //-------------------------------------------------------------------------------
@@ -125,7 +124,20 @@ end
 //-------------------------------------------------------------------------------
 // LSU <-> EXU interface
 //-------------------------------------------------------------------------------
-assign lsu2exu_rdy  =   (dmem_resp_ok | dmem_resp_er);
+//assign lsu2exu_rdy  =   (dmem_resp_ok | dmem_resp_er);
+logic [10: 0] count; 
+always_ff@(posedge clk or negedge rst_n)
+begin
+if(!rst_n)
+	count <= '0;
+else if(exu2lsu_req && count!= 500)
+	count <= count + 1'b1;
+else 
+	count <= '0;
+end
+
+assign lsu2exu_rdy = count == 500;
+
 assign lsu2exu_exc  =   dmem_resp_er | l_misalign | s_misalign
 `ifdef SCR1_BRKM_EN
                         | lsu_hwbrk
@@ -327,4 +339,4 @@ SCR1_COV_LSU_MISALIGN_BRKPT : cover property (
 
 `endif // SCR1_SIM_ENV
 
-endmodule : scr1_pipe_lsu
+endmodule : rlwe_pipe_rlwe

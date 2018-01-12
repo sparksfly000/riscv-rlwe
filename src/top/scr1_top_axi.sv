@@ -160,8 +160,8 @@ type_vector						                         core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
 
 // Coprosser FIFO Interface 
-type_micro_instr_s                                  core_co_instr;
-
+logic [`SCR1_IMEM_DWIDTH-1:0]   				          idu2rlwe_instr;         // RLWE instruction
+logic                                               idu2rlwe_valid;         // RLWE instruction valid signal
 
 // Instruction memory interface from router to AXI bridge
 logic                                               axi_imem_req_ack;
@@ -219,7 +219,7 @@ logic                                               axi_imem_idle;
 logic                                               axi_dmem_idle;
 
 // FIFO to rlwe core instr memory interface
-localparam FIFO_DATA_WIDTH = 64;
+localparam FIFO_DATA_WIDTH = 32;
 logic                                               full;
 logic                                               almost_full;
 logic                                               empty;
@@ -262,7 +262,8 @@ scr1_core_top i_core_top (
     .imem_addr      (core_imem_addr     ),
     .imem_rdata     (core_imem_rdata    ),
     .imem_resp      (core_imem_resp     ),
-	 .pipe2core_instr(core_co_instr      ),
+    .idu2rlwe_instr (idu2rlwe_instr     ),   
+	 .idu2rlwe_valid (idu2rlwe_valid     ),    
     // Data memory interface
     .dmem_req_ack   (core_dmem_req_ack  ),
     .dmem_req       (core_dmem_req      ),
@@ -282,14 +283,14 @@ sync_fifo #(.WIDTH (FIFO_DATA_WIDTH))
     (.clk          (clk                 ),
      .rst_n        (rst_n               ),
      .flush_en     (1'b0                ),    // flush is synchronous, unlike reset
-     .full         (ful                 ),
+     .full         (full                ),
      .almost_full  ( almost_full        ),
-     .enqueue_en   (core_co_instr.micro_valid),
-     .value_i      (core_co_instr.micro_op),
-     .empty        (empty                 ),
-     .almost_empty (almost_empty          ),
-     .dequeue_en   (dequeue_en            ),
-     .value_o      (value_o               )
+     .enqueue_en   (idu2rlwe_valid      ),
+     .value_i      (idu2rlwe_instr      ),
+     .empty        (empty               ),
+     .almost_empty (almost_empty        ),
+     .dequeue_en   (dequeue_en          ),
+     .value_o      (value_o             )
 );
 
 //--------------------------------------------------------

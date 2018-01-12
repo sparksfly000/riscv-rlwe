@@ -202,14 +202,19 @@ typedef enum logic [SCR1_MICRO_OP_WIDTH_E - 1 : 0] {
 	MICRO_SAMPLE,
 	MICRO_PAIRWISE_ADD,
    MICRO_PAIRWISE_SUB,
-   MICRO_PAIRWISE_MUL
+   MICRO_PAIRWISE_MUL,
+	MICRO_END
 
-}type_micro_sel_e;
+}type_rlwe_sel_e;
 
 typedef struct packed {
-	type_micro_sel_e micro_op;	
-   logic            micro_valid;
-}type_micro_instr_s;
+	 type_rlwe_sel_e  rlwe_op;	
+    logic            rlwe_valid;
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rs1_addr;  
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rs2_addr;
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rd_addr;
+
+}type_rlwe_cmd_s;
 
 `endif // SCR1_RISCV_ISA_DECODING_SVH
 

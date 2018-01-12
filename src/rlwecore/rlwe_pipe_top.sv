@@ -21,7 +21,7 @@
 `include "scr1_brkm.svh"
 `endif // SCR1_BRKM_EN
 
-module scr1_pipe_top (
+module rlwe_pipe_top (
     // Common
     input   logic                                       rst_n,
     input   logic                                       clk,
@@ -44,9 +44,6 @@ module scr1_pipe_top (
     input   type_vector						                 dmem_rdata,
     input   type_scr1_mem_resp_e                        dmem_resp,
 
-     // Copressor Micro Instruction Interface
-    output  logic [`SCR1_IMEM_DWIDTH-1:0]   				  idu2rlwe_instr,         // RLWE instruction
-	 output  logic                                       idu2rlwe_valid,         // RLWE instruction valid signal
 
 `ifdef SCR1_DBGC_EN
     // DBGC interface
@@ -133,6 +130,8 @@ logic                                       idu2ifu_rdy;            // IDU ready
 // IDU <-> EXU
 logic                                       idu2exu_req;            // IDU request
 type_scr1_exu_cmd_s                         idu2exu_cmd;            // IDU command (see scr1_riscv_isa_decoding.svh)
+
+type_rlwe_cmd_s                             idu2exu_rlwe_cmd;       // RLWE command (see scr1_riscv_isa_decoding.svh)
 `ifndef SCR1_EXU_STAGE_BYPASS
 logic                                       idu2exu_use_rs1;        // Instruction uses rs1
 logic                                       idu2exu_use_rs2;        // Instruction uses rs2
@@ -253,7 +252,7 @@ assign dbgc_hart_pcsample = curr_pc;
 //-------------------------------------------------------------------------------
 // Instruction fetch unit
 //-------------------------------------------------------------------------------
-scr1_pipe_ifu i_pipe_ifu (
+rlwe_pipe_ifu i_pipe_ifu (
     .rst_n              (rst_n              ),
     .clk                (clk                ),
 
@@ -263,6 +262,7 @@ scr1_pipe_ifu i_pipe_ifu (
     .imem_addr          (imem_addr          ),
     .imem_rdata         (imem_rdata         ),
     .imem_resp          (imem_resp          ),
+
 
     .new_pc             (new_pc             ),
     .new_pc_req         (new_pc_req         ),
@@ -286,7 +286,7 @@ scr1_pipe_ifu i_pipe_ifu (
 //-------------------------------------------------------------------------------
 // Instruction decode unit
 //-------------------------------------------------------------------------------
-scr1_pipe_idu i_pipe_idu (
+rlwe_pipe_idu i_pipe_idu (
 `ifdef SCR1_SIM_ENV
     .rst_n              (rst_n              ),
     .clk                (clk                ),
@@ -299,9 +299,7 @@ scr1_pipe_idu i_pipe_idu (
 
     .idu2exu_req        (idu2exu_req        ),
     .idu2exu_cmd        (idu2exu_cmd        ),
-    .idu2rlwe_instr     (idu2rlwe_instr     ),   
-	 .idu2rlwe_valid     (idu2rlwe_valid     ),    
-	
+	 .idu2exu_rlwe_cmd   (idu2exu_rlwe_cmd   ),
 `ifndef SCR1_EXU_STAGE_BYPASS
     .idu2exu_use_rs1    (idu2exu_use_rs1    ),
     .idu2exu_use_rs2    (idu2exu_use_rs2    ),
@@ -321,7 +319,7 @@ scr1_pipe_idu i_pipe_idu (
 //-------------------------------------------------------------------------------
 // Execution unit
 //-------------------------------------------------------------------------------
-scr1_pipe_exu i_pipe_exu (
+rlwe_pipe_exu i_pipe_exu (
     .rst_n                  (rst_n                ),
     .clk                    (clk                  ),
 `ifdef SCR1_CLKCTRL_EN
@@ -331,6 +329,7 @@ scr1_pipe_exu i_pipe_exu (
     .idu2exu_req            (idu2exu_req          ),
     .exu2idu_rdy            (exu2idu_rdy          ),
     .idu2exu_cmd            (idu2exu_cmd          ),
+	 .idu2exu_rlwe_cmd       (idu2exu_rlwe_cmd     ),
 `ifndef SCR1_EXU_STAGE_BYPASS
     .idu2exu_use_rs1        (idu2exu_use_rs1      ),
     .idu2exu_use_rs2        (idu2exu_use_rs2      ),
@@ -420,7 +419,7 @@ scr1_pipe_exu i_pipe_exu (
 //-------------------------------------------------------------------------------
 // Multi-port register file
 //-------------------------------------------------------------------------------
-scr1_pipe_mprf i_pipe_mprf (
+rlwe_pipe_mprf i_pipe_mprf (
     .rst_n                  (rst_n            ),
     .clk                    (clk              ),
     .exu2mprf_rs1_addr      (exu2mprf_rs1_addr),
@@ -438,7 +437,7 @@ scr1_pipe_mprf i_pipe_mprf (
 //-------------------------------------------------------------------------------
 // Control and status registers
 //-------------------------------------------------------------------------------
-scr1_pipe_csr i_pipe_csr (
+rlwe_pipe_csr i_pipe_csr (
     .rst_n                  (rst_n              ),
     .clk                    (clk                ),
 `ifdef SCR1_CLKCTRL_EN
@@ -499,7 +498,7 @@ scr1_pipe_csr i_pipe_csr (
 // Integrated programmable interrupt controller
 //-------------------------------------------------------------------------------
 `ifdef SCR1_IPIC_EN
-scr1_ipic i_pipe_ipic (
+rlwe_ipic i_pipe_ipic (
     .rst_n              (rst_n          ),
 `ifdef SCR1_CLKCTRL_EN
     .clk                (clk_alw_on     ),
@@ -520,7 +519,7 @@ scr1_ipic i_pipe_ipic (
 // Breakpoint module
 //-------------------------------------------------------------------------------
 `ifdef SCR1_BRKM_EN
-scr1_pipe_brkm i_pipe_brkm (
+rlwe_pipe_brkm i_pipe_brkm (
     .rst_n                  (rst_n                  ),
     .clk                    (clk                    ),
     .clk_en                 (1'b1                   ),
@@ -559,7 +558,7 @@ scr1_pipe_brkm i_pipe_brkm (
 // Pipeline debug agent
 //-------------------------------------------------------------------------------
 `ifdef SCR1_DBGC_EN
-scr1_pipe_dbga i_pipe_dbga (
+rlwe_pipe_dbga i_pipe_dbga (
     .rst_n              (rst_n                  ),
 `ifdef SCR1_CLKCTRL_EN
     .clk_pipe_en        (clk_pipe_en            ),
@@ -607,7 +606,7 @@ scr1_pipe_dbga i_pipe_dbga (
 // Tracelog
 //-------------------------------------------------------------------------------
 
-scr1_tracelog i_tracelog (
+rlwe_tracelog i_tracelog (
     .rst_n          (rst_n                              ),
     .clk            (clk                                ),
     .fuse_mhartid   (fuse_mhartid                       ),
@@ -641,4 +640,4 @@ scr1_tracelog i_tracelog (
 
 `endif // SCR1_SIM_ENV
 
-endmodule : scr1_pipe_top
+endmodule : rlwe_pipe_top

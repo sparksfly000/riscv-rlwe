@@ -8,7 +8,7 @@
 `include "scr1_riscv_isa_decoding.svh"
 `include "scr1_arch_description.svh"
 
-module scr1_pipe_idu
+module rlwe_pipe_idu
 (
 `ifdef SCR1_SIM_ENV
     input   logic                           rst_n,
@@ -25,8 +25,7 @@ module scr1_pipe_idu
     // IDU <-> EXU interface
     output  logic                           idu2exu_req,            // IDU request
     output  type_scr1_exu_cmd_s             idu2exu_cmd,            // IDU command
-    output  logic [`SCR1_IMEM_DWIDTH-1:0]   idu2rlwe_instr,         // RLWE instruction
-	 output  logic                           idu2rlwe_valid,         // RLWE instruction valid signal
+    output  type_rlwe_cmd_s                 idu2exu_rlwe_cmd,       // RLWE  command
     output  logic                           idu2exu_use_rs1,        // Instruction uses rs1
     output  logic                           idu2exu_use_rs2,        // Instruction uses rs2
     output  logic                           idu2exu_use_rd,         // Instruction uses rd
@@ -106,9 +105,12 @@ always_comb begin
 	 idu2exu_cmd.rs1_is_vector= 1'b0;
 	 idu2exu_cmd.rs2_is_vector= 1'b0;
 	 idu2exu_cmd.rd_is_vector= 1'b0;
-	 // micro
-	 idu2rlwe_instr          = '0; 
-	 idu2rlwe_valid          = 1'b0; 
+	 // micro 
+	 idu2exu_rlwe_cmd.rlwe_op     = MICRO_NONE; 
+    idu2exu_rlwe_cmd.rlwe_valid  = 1'b0;
+    idu2exu_rlwe_cmd.rs1_addr    = '0;
+    idu2exu_rlwe_cmd.rs2_addr    = '0;
+    idu2exu_rlwe_cmd.rd_addr     = '0;
     // Clock gating
     idu2exu_use_rs1         = 1'b0;
     idu2exu_use_rs2         = 1'b0;
@@ -520,8 +522,20 @@ always_comb begin
                     end // SCR1_OPCODE_VSTORE
 							  
                     SCR1_OPCODE_MICRO          : begin
-								idu2rlwe_valid = 1'b1;
-								idu2rlwe_instr = instr;
+								if(ifu2idu_vd == 1'b1) begin
+									idu2exu_rlwe_cmd.rlwe_valid = 1'b1;
+								end
+                               case (funct3)
+                                    3'b000  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_NTT;
+                                    3'b001  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_INTT;
+                                    3'b010  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_SAMPLE;
+                                    3'b011  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_PAIRWISE_ADD;
+                                    3'b100  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_PAIRWISE_SUB;
+                                    3'b101  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_PAIRWISE_MUL;
+                                    3'b111  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_END;
+                                    default : idu2exu_rlwe_cmd.rlwe_op  = MICRO_NONE;
+										endcase // funct3
+
 `ifdef SCR1_RVE_EXT
                         if (instr[11] | instr[19] | instr[24])  rve_illegal = 1'b1;
 `endif  // SCR1_RVE_EXT
@@ -939,4 +953,4 @@ SCR1_SVA_IDU_IALU_CMD_RANGE : assert property (
 
 `endif // SCR1_SIM_ENV
 
-endmodule : scr1_pipe_idu
+endmodule : rlwe_pipe_idu

@@ -17,7 +17,7 @@
 `include "scr1_ipic.svh"
 `endif // SCR1_IPIC_EN
 
-module scr1_core_top (
+module rlwe_core_top (
     // Common
     input   logic                                   rst_n,
     input   logic                                   test_mode,
@@ -56,10 +56,6 @@ module scr1_core_top (
     output  logic [`SCR1_IMEM_AWIDTH-1:0]           imem_addr,
     input   logic [`SCR1_IMEM_DWIDTH-1:0]           imem_rdata,
     input   type_scr1_mem_resp_e                    imem_resp,
-
-	// Coprosser FIFO Interface 
-    output  logic [`SCR1_IMEM_DWIDTH-1:0]   			 idu2rlwe_instr,         // RLWE instruction
-	 output  logic                                   idu2rlwe_valid,         // RLWE instruction valid signal
 
     // Data Memory Interface
     input   logic                                   dmem_req_ack,
@@ -178,7 +174,7 @@ assign rst_n_out = core_rst_n;
 //-------------------------------------------------------------------------------
 // SCR1 pipeline
 //-------------------------------------------------------------------------------
-scr1_pipe_top i_pipe_top (
+rlwe_pipe_top i_pipe_top (
     // Control
     .rst_n                  (core_rst_n         ),
 `ifndef SCR1_CLKCTRL_EN
@@ -208,9 +204,6 @@ scr1_pipe_top i_pipe_top (
     .dmem_rdata             (dmem_rdata		   ),
     .dmem_resp              (dmem_resp          ),
 
-     // Copressor Micro Instruction Interface
-    .idu2rlwe_instr     	 (idu2rlwe_instr     ),   
-	 .idu2rlwe_valid         (idu2rlwe_valid     ),    
 
 `ifdef SCR1_DBGC_EN
     // Debug interface
@@ -388,4 +381,4 @@ scr1_clk_ctrl i_clk_ctrl (
 );
 `endif // SCR1_CLKCTRL_EN
 
-endmodule : scr1_core_top
+endmodule : rlwe_core_top

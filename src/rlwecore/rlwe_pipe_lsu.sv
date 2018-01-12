@@ -12,7 +12,7 @@
 `include "scr1_brkm.svh"
 `endif // SCR1_BRKM_EN
 
-module scr1_pipe_lsu (
+module rlwe_pipe_lsu (
     // Common
     input   logic                               rst_n,
     input   logic                               clk,
@@ -49,7 +49,6 @@ module scr1_pipe_lsu (
 
 
 localparam  lane_sub_one=`LANE-1;
-
 //-------------------------------------------------------------------------------
 // Local types declaration
 //-------------------------------------------------------------------------------
@@ -327,4 +326,4 @@ SCR1_COV_LSU_MISALIGN_BRKPT : cover property (
 
 `endif // SCR1_SIM_ENV
 
-endmodule : scr1_pipe_lsu
+endmodule : rlwe_pipe_lsu
