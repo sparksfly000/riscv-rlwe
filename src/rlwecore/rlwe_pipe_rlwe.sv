@@ -47,7 +47,7 @@ module rlwe_pipe_rlwe (
 );
 
 
-
+localparam tcm_base_addr = `SCR1_DMEM_AWIDTH'h480000;
 localparam  lane_sub_one=`LANE-1;
 //-------------------------------------------------------------------------------
 // Local types declaration
@@ -126,17 +126,20 @@ end
 //-------------------------------------------------------------------------------
 //assign lsu2exu_rdy  =   (dmem_resp_ok | dmem_resp_er);
 logic [10: 0] count; 
-always_ff@(posedge clk or negedge rst_n)
-begin
-if(!rst_n)
-	count <= '0;
-else if(exu2lsu_req && count!= 500)
-	count <= count + 1'b1;
-else 
-	count <= '0;
+always_ff@(posedge clk or negedge rst_n) begin
+	if(!rst_n) begin
+		count <= '0;
+		lsu2exu_rdy <= 1'b0;
+	end else if(exu2lsu_req && count!= 64) begin
+		count <= count + 1'b1;
+		lsu2exu_rdy <= 1'b0;
+	end else if(count== 64) begin
+		count <= '0;
+	lsu2exu_rdy <= 1'b1;
+	end
 end
 
-assign lsu2exu_rdy = count == 500;
+//assign lsu2exu_rdy = count == 64;
 
 assign lsu2exu_exc  =   dmem_resp_er | l_misalign | s_misalign
 `ifdef SCR1_BRKM_EN
@@ -181,19 +184,19 @@ always_comb begin
     case (lsu_cmd_r)
         SCR1_LSU_CMD_LV     : lsu2exu_l_data = dmem2lsu_rdata;
         SCR1_LSU_CMD_LW     : begin lsu2exu_l_data[0] = dmem2lsu_rdata[0];
-												lsu2exu_l_data[15:1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
         SCR1_LSU_CMD_LH     : begin lsu2exu_l_data[0] = signed'(dmem2lsu_rdata[0][15:0]);
-												lsu2exu_l_data[15:1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
         SCR1_LSU_CMD_LHU    : begin lsu2exu_l_data[0] = unsigned'(dmem2lsu_rdata[0][15:0]);
-												lsu2exu_l_data[15:1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
         SCR1_LSU_CMD_LB     : begin lsu2exu_l_data[0] =  signed'  (dmem2lsu_rdata[0][7:0]);
-												lsu2exu_l_data[15:1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
 		  SCR1_LSU_CMD_LBU    : begin lsu2exu_l_data[0] =  unsigned'(dmem2lsu_rdata[0][7:0]);
-												lsu2exu_l_data[15:1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
 		  default             : lsu2exu_l_data = '0;
     endcase // lsu_cmd_r
@@ -203,8 +206,7 @@ end
 // Data memory interface
 //-------------------------------------------------------------------------------
 assign lsu2dmem_req     = exu2lsu_req & ~lsu2exu_exc & (fsm == SCR1_FSM_IDLE);
-assign lsu2dmem_addr    = exu2lsu_addr;
-assign lsu2dmem_wdata   = exu2lsu_s_data;
+assign lsu2dmem_addr    = tcm_base_addr + exu2lsu_addr;
 
 always_comb begin
     case (exu2lsu_cmd)

@@ -10,8 +10,21 @@ module rlwecore
     	input logic                 empty,
     	input logic                 almost_empty,
     	output logic                dequeue_en,
-    	input [WIDTH - 1:0]         value_o);		
+    	input [WIDTH - 1:0]         value_o,
 
+	 // rlwe core interface 
+    input    logic                           rlwe_dmem_req_ack,
+    output   logic                           rlwe_dmem_req,
+    output   type_scr1_mem_cmd_e             rlwe_dmem_cmd,
+    output   type_scr1_mem_width_e           rlwe_dmem_width,
+    output   logic [`SCR1_DMEM_AWIDTH-1:0]   rlwe_dmem_addr,
+    output   type_vector						   rlwe_dmem_wdata,
+    input    type_vector						   rlwe_dmem_rdata,
+    input    type_scr1_mem_resp_e            rlwe_dmem_resp
+);		
+
+
+//  assign rlwe_dmem_req = 1'b0;
 //-----------------------------------------------
 // move instr from FIFO to instr memory logic
 //-----------------------------------------------
@@ -58,17 +71,17 @@ module rlwecore
 
 rlwe_core_top i_rlwecore_top(
     // Common
- /*   input   logic  */                                  .rst_n(rst_n),
+ /*   input   logic  */                                 .rst_n(rst_n),
  /*   input   logic   */                                .test_mode(),
  /*   input   logic   */                                .clk(clk),
 /*    output  logic   */                                .rst_n_out(),
 
     // Fuses
-  /*  input   logic [`SCR1_XLEN-1:0]  */                 .fuse_mhartid('1),
+  /*  input   logic [`SCR1_XLEN-1:0]  */                .fuse_mhartid('1),
 
     // IRQ
 `ifdef SCR1_IPIC_EN
-/*    input   logic [SCR1_IRQ_LINES_NUM-1:0] */          .irq_lines(),
+/*    input   logic [SCR1_IRQ_LINES_NUM-1:0] */         .irq_lines(),
 `else
  /*   input   logic    */                               .ext_irq(1'b0),
 `endif // SCR1_IPIC_EN 
@@ -88,14 +101,14 @@ rlwe_core_top i_rlwecore_top(
    /* input   type_scr1_mem_resp_e          */          .imem_resp(SCR1_MEM_RESP_RDY_OK),
 
     // Data Memory Interface
- /*   input   logic                          */         .dmem_req_ack(1'b0),
- /*   output  logic                         */          .dmem_req(),
- /*   output  type_scr1_mem_cmd_e          */           .dmem_cmd(),
- /*   output  type_scr1_mem_width_e          */         .dmem_width(),
- /*   output  logic [`SCR1_DMEM_AWIDTH-1:0]  */         .dmem_addr(),
- /*   output  type_vector						   */          .dmem_wdata(),
- /*   input   type_vector						   */          .dmem_rdata(),
- /*   input   type_scr1_mem_resp_e           */         .dmem_resp(SCR1_MEM_RESP_NOTRDY)
+ /*   input   logic                          */         .dmem_req_ack(rlwe_dmem_req_ack),
+ /*   output  logic                         */          .dmem_req(rlwe_dmem_req),
+ /*   output  type_scr1_mem_cmd_e          */           .dmem_cmd(rlwe_dmem_cmd),
+ /*   output  type_scr1_mem_width_e          */         .dmem_width(rlwe_dmem_width),
+ /*   output  logic [`SCR1_DMEM_AWIDTH-1:0]  */         .dmem_addr(rlwe_dmem_addr),
+ /*   output  type_vector						   */         .dmem_wdata(rlwe_dmem_wdata),
+ /*   input   type_vector						   */         .dmem_rdata(rlwe_dmem_rdata),
+ /*   input   type_scr1_mem_resp_e           */         .dmem_resp(rlwe_dmem_resp)
 );
 
 

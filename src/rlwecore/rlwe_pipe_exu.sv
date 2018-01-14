@@ -141,6 +141,13 @@ localparam SCR1_JUMP_MASK = `SCR1_XLEN'hFFFF_FFFE;
 // Local signals declaration
 //-------------------------------------------------------------------------------
 
+typedef enum logic [1:0] {
+		RLWE_IDIE,
+		RLWE_EXE,
+		RLWE_EXE_MID
+}type_fsm_rlwe_e;
+
+
 // Instruction queue
 logic                           exu_queue_vd;
 type_scr1_exu_cmd_s             exu_queue;
@@ -164,7 +171,7 @@ logic                           ialu_cmp;
 
 // LSU signals
 logic                           lsu_req;
-logic                           rlwe_req;
+logic                           rlwe_vd;
 logic                           lsu_rdy;
 type_vector 			           lsu_l_data;
 logic                           lsu_exc;
@@ -398,13 +405,57 @@ rlwe_pipe_lsu i_lsu(
 //-------------------------------------------------------------------------------
 // Load/Store
 //-------------------------------------------------------------------------------
-assign rlwe_req  = ((rlwe_exu_queue.rlwe_op != MICRO_NONE) & exu_queue_vd);
-assign lsu_req = rlwe_req;
+assign rlwe_vd  = ((rlwe_exu_queue.rlwe_op != MICRO_NONE) & exu_queue_vd);
+//assign lsu_req = rlwe_vd;
+type_fsm_rlwe_e rlwe_fsm;
+
+logic [7:0] exe_cycle;
+always_ff @(posedge clk or negedge rst_n) begin
+		if(!rst_n) begin
+			rlwe_fsm  <= RLWE_IDIE;
+			exe_cycle <= '0;
+		end else begin
+			 case(rlwe_fsm) 
+				RLWE_IDIE : begin
+					if(rlwe_vd)
+						rlwe_fsm <= RLWE_EXE;
+				end
+				RLWE_EXE : begin
+					if(dmem2exu_resp == SCR1_MEM_RESP_RDY_OK | dmem2exu_resp == SCR1_MEM_RESP_RDY_ER) begin
+						rlwe_fsm  <= RLWE_EXE_MID;
+							if(exe_cycle!= 63) begin
+								exe_cycle <= exe_cycle + 1'b1;
+							end else begin
+								exe_cycle <= '0;
+							end
+					end
+				end
+				RLWE_EXE_MID : begin
+					if(rlwe_vd)
+						rlwe_fsm <= RLWE_EXE;
+					else
+						rlwe_fsm <= RLWE_IDIE;
+				end
+				default : begin
+				end
+			 endcase
+		end 
+end
+
+always_comb begin
+	case(rlwe_fsm)
+		RLWE_IDIE : lsu_req = 1'b0;
+		RLWE_EXE  : lsu_req = 1'b1;
+		RLWE_EXE  : lsu_req = 1'b0;
+		default   : lsu_req = 1'b0;
+	endcase
+end
+
 rlwe_pipe_rlwe i_rlwe(
     .rst_n              (rst_n),
     .clk                (clk),
 
-    .exu2lsu_req        (rlwe_req),              // Request to LSU
+    .exu2lsu_req        (lsu_req),              // Request to LSU
     .exu2lsu_cmd        (exu_queue.lsu_cmd),    // LSU command
     .exu2lsu_addr       (ialu_sum2_res),        // DMEM address
     .exu2lsu_s_data     (mprf2exu_rs2_data),    // Data for store to DMEM
@@ -737,7 +788,7 @@ always_comb begin
         ialu_vd                 : exu_rdy = ialu_rdy;
 `endif // SCR1_RVM_EXT
         csr2exu_mstatus_mie_up  : exu_rdy = 1'b0;
-        default                 : exu_rdy = 1'b1;
+        default                 : exu_rdy = 1'b0; // modify the default 1'b1 -> 1'b0
     endcase
 end
 

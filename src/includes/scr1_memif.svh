@@ -19,12 +19,12 @@ typedef enum logic {
 //-------------------------------------------------------------------------------
 // Memory data width enum
 //-------------------------------------------------------------------------------
-typedef enum logic[1:0] {
-    SCR1_MEM_WIDTH_BYTE     = 2'b00,
-    SCR1_MEM_WIDTH_HWORD    = 2'b01,
-    SCR1_MEM_WIDTH_WORD     = 2'b10,
-    SCR1_MEM_WIDTH_VECTOR   = 2'b11
-  //  SCR1_MEM_WIDTH_ERROR    = 'x
+typedef enum logic[2:0] {
+    SCR1_MEM_WIDTH_BYTE     = 3'b000,
+    SCR1_MEM_WIDTH_HWORD    = 3'b001,
+    SCR1_MEM_WIDTH_WORD     = 3'b010,
+    SCR1_MEM_WIDTH_VECTOR   = 3'b011,
+    SCR1_MEM_WIDTH_ERROR    = 'x
 } type_scr1_mem_width_e;
 
 //-------------------------------------------------------------------------------

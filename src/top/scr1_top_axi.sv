@@ -159,6 +159,16 @@ type_vector						                         core_dmem_wdata;
 type_vector						                         core_dmem_rdata;
 type_scr1_mem_resp_e                                core_dmem_resp;
 
+// Data memory interface from rlwe core to router
+logic                                               rlwe_dmem_req_ack;
+logic                                               rlwe_dmem_req;
+type_scr1_mem_cmd_e                                 rlwe_dmem_cmd;
+type_scr1_mem_width_e                               rlwe_dmem_width;
+logic [`SCR1_DMEM_AWIDTH-1:0]                       rlwe_dmem_addr;
+type_vector						                         rlwe_dmem_wdata;
+type_vector						                         rlwe_dmem_rdata;
+type_scr1_mem_resp_e                                rlwe_dmem_resp;
+
 // Coprosser FIFO Interface 
 logic [`SCR1_IMEM_DWIDTH-1:0]   				          idu2rlwe_instr;         // RLWE instruction
 logic                                               idu2rlwe_valid;         // RLWE instruction valid signal
@@ -310,7 +320,17 @@ rlwecore #(.WIDTH(FIFO_DATA_WIDTH))
      .empty         (empty            ),
      .almost_empty  (almost_empty     ),
      .dequeue_en    (dequeue_en       ),
-     .value_o       (value_o          ));		
+     .value_o       (value_o          ),
+
+    .rlwe_dmem_req_ack   (rlwe_dmem_req_ack  ),
+    .rlwe_dmem_req       (rlwe_dmem_req      ),
+    .rlwe_dmem_cmd       (rlwe_dmem_cmd      ),
+    .rlwe_dmem_width     (rlwe_dmem_width    ),
+    .rlwe_dmem_addr      (rlwe_dmem_addr     ),
+    .rlwe_dmem_wdata     (rlwe_dmem_wdata    ),
+    .rlwe_dmem_rdata     (rlwe_dmem_rdata    ),
+    .rlwe_dmem_resp      (rlwe_dmem_resp     )
+);		
 
 
 
@@ -332,14 +352,24 @@ scr1_tcm #(
     .imem_rdata     (tcm_imem_rdata     ),
     .imem_resp      (tcm_imem_resp      ),
     // Data interface to TCM
-    .dmem_req_ack   (tcm_dmem_req_ack   ),
-    .dmem_req       (tcm_dmem_req       ),
-    .dmem_cmd       (tcm_dmem_cmd       ),
-    .dmem_width     (tcm_dmem_width     ),
-    .dmem_addr      (tcm_dmem_addr      ),
-    .dmem_wdata     (tcm_dmem_wdata     ),
-    .dmem_rdata     (tcm_dmem_rdata     ),
-    .dmem_resp      (tcm_dmem_resp      )
+    .core_dmem_req_ack   (tcm_dmem_req_ack   ),
+    .core_dmem_req       (tcm_dmem_req       ),
+    .core_dmem_cmd       (tcm_dmem_cmd       ),
+    .core_dmem_width     (tcm_dmem_width     ),
+    .core_dmem_addr      (tcm_dmem_addr      ),
+    .core_dmem_wdata     (tcm_dmem_wdata     ),
+    .core_dmem_rdata     (tcm_dmem_rdata     ),
+    .core_dmem_resp      (tcm_dmem_resp      ),
+
+    // rlwe interface to TCM
+    .rlwe_dmem_req_ack   (rlwe_dmem_req_ack   ),
+    .rlwe_dmem_req       (rlwe_dmem_req       ),
+    .rlwe_dmem_cmd       (rlwe_dmem_cmd       ),
+    .rlwe_dmem_width     (rlwe_dmem_width     ),
+    .rlwe_dmem_addr      (rlwe_dmem_addr      ),
+    .rlwe_dmem_wdata     (rlwe_dmem_wdata     ),
+    .rlwe_dmem_rdata     (rlwe_dmem_rdata     ),
+    .rlwe_dmem_resp      (rlwe_dmem_resp      )
 );
 `endif // SCR1_TCM_EN
 
@@ -432,14 +462,23 @@ scr1_dmem_router #(
     .rst_n          (rst_n_out          ),
     .clk            (clk                ),
     // Interface to core
-    .dmem_req_ack   (core_dmem_req_ack  ),
-    .dmem_req       (core_dmem_req      ),
-    .dmem_cmd       (core_dmem_cmd      ),
-    .dmem_width     (core_dmem_width    ),
-    .dmem_addr      (core_dmem_addr     ),
-    .dmem_wdata     (core_dmem_wdata    ),
-    .dmem_rdata     (core_dmem_rdata    ),
-    .dmem_resp      (core_dmem_resp     ),
+    .core_dmem_req_ack   (core_dmem_req_ack  ),
+    .core_dmem_req       (core_dmem_req      ),
+    .core_dmem_cmd       (core_dmem_cmd      ),
+    .core_dmem_width     (core_dmem_width    ),
+    .core_dmem_addr      (core_dmem_addr     ),
+    .core_dmem_wdata     (core_dmem_wdata    ),
+    .core_dmem_rdata     (core_dmem_rdata    ),
+    .core_dmem_resp      (core_dmem_resp     ),
+    // Interface to rlwe core
+    .rlwe_dmem_req_ack   (                   ),
+    .rlwe_dmem_req       (1'b0               ),
+    .rlwe_dmem_cmd       (                   ),
+    .rlwe_dmem_width     (                   ),
+    .rlwe_dmem_addr      (                   ),
+    .rlwe_dmem_wdata     (                   ),
+    .rlwe_dmem_rdata     (                   ),
+    .rlwe_dmem_resp      (                   ),
 `ifdef SCR1_TCM_EN
     // Interface to TCM
     .port1_req_ack  (tcm_dmem_req_ack   ),

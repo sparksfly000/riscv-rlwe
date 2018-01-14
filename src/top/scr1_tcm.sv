@@ -24,15 +24,39 @@ module scr1_tcm
     output  type_scr1_mem_resp_e            imem_resp,
 
     // Core data interface
-    output  logic                           dmem_req_ack,
-    input   logic                           dmem_req,
-    input   type_scr1_mem_cmd_e             dmem_cmd,
-    input   type_scr1_mem_width_e           dmem_width,
-    input   logic [`SCR1_DMEM_AWIDTH-1:0]   dmem_addr,
-    input   type_vector						     dmem_wdata,
-    output  type_vector						     dmem_rdata,
-    output  type_scr1_mem_resp_e            dmem_resp
+    output  logic                           core_dmem_req_ack,
+    input   logic                           core_dmem_req,
+    input   type_scr1_mem_cmd_e             core_dmem_cmd,
+    input   type_scr1_mem_width_e           core_dmem_width,
+    input   logic [`SCR1_DMEM_AWIDTH-1:0]   core_dmem_addr,
+    input   type_vector						     core_dmem_wdata,
+    output  type_vector						     core_dmem_rdata,
+    output  type_scr1_mem_resp_e            core_dmem_resp,
+    
+    // rlwe interface
+	 output  logic                           rlwe_dmem_req_ack,
+    input   logic                           rlwe_dmem_req,
+    input   type_scr1_mem_cmd_e             rlwe_dmem_cmd,
+    input   type_scr1_mem_width_e           rlwe_dmem_width,
+    input   logic [`SCR1_DMEM_AWIDTH-1:0]   rlwe_dmem_addr,
+    input   type_vector						     rlwe_dmem_wdata,
+    output  type_vector						     rlwe_dmem_rdata,
+    output  type_scr1_mem_resp_e            rlwe_dmem_resp
 );
+
+//-------------------------------------------------------------------------------
+// Local types declaration
+//-------------------------------------------------------------------------------
+typedef enum logic {
+    SCR1_FSM_ADDR,
+    SCR1_FSM_DATA
+} type_scr1_fsm_e;
+
+typedef enum logic {
+    SCR1_SEL_CORE,
+    SCR1_SEL_RLWE
+} type_core_sel_e;
+
 
 //-------------------------------------------------------------------------------
 // Local signal declaration
@@ -47,6 +71,121 @@ type_vector						         dmem_rdata_local;
 logic [3:0]                         dmem_byteen;
 logic [1:0]                         dmem_rdata_shift_reg;
 logic                               w_is_vector;
+type_scr1_fsm_e                     fsm;
+type_core_sel_e                     core_sel;
+type_core_sel_e                     core_sel_r;
+type_scr1_mem_cmd_e                 dmem_cmd;
+type_scr1_mem_width_e               dmem_width;
+logic [`SCR1_DMEM_AWIDTH-1:0]       dmem_addr;
+type_vector						         dmem_wdata;
+type_scr1_mem_resp_e                dmem_resp;
+type_vector						         dmem_rdata;
+logic                               sel_req_ack;
+
+
+//-------------------------------------------------------------------------------
+// core or rlwe select logic
+//-------------------------------------------------------------------------------
+assign dmem_req = core_dmem_req | rlwe_dmem_req;
+
+always_comb begin
+	core_sel = SCR1_SEL_CORE;
+	if (core_dmem_req)                       // the core has the higher priority
+		core_sel = SCR1_SEL_CORE;
+	else if(rlwe_dmem_req)
+		core_sel = SCR1_SEL_RLWE;
+end
+
+assign dmem_cmd =(core_sel == SCR1_SEL_CORE) ? core_dmem_cmd : rlwe_dmem_cmd;
+assign dmem_width =(core_sel == SCR1_SEL_CORE) ? core_dmem_width : rlwe_dmem_width;
+assign dmem_addr =(core_sel == SCR1_SEL_CORE) ? core_dmem_addr : rlwe_dmem_addr;
+assign dmem_wdata =(core_sel == SCR1_SEL_CORE) ? core_dmem_wdata : rlwe_dmem_wdata;
+
+
+// FSM
+always_ff @(negedge rst_n, posedge clk) begin
+    if (~rst_n) begin
+        fsm         <= SCR1_FSM_ADDR;
+		  core_sel_r  <= SCR1_SEL_CORE;
+    end else begin
+        case (fsm)
+            SCR1_FSM_ADDR : begin
+                if (dmem_req & sel_req_ack) begin
+                    fsm         <= SCR1_FSM_DATA;
+						  core_sel_r  <= core_sel;
+                end
+            end
+            SCR1_FSM_DATA : begin
+                case (dmem_resp)
+                    SCR1_MEM_RESP_RDY_OK : begin
+                        if (dmem_req & sel_req_ack) begin
+                            fsm         <= SCR1_FSM_DATA;
+									 core_sel_r  <= core_sel;
+                        end else begin
+                            fsm <= SCR1_FSM_ADDR;
+                        end
+                    end
+                    SCR1_MEM_RESP_RDY_ER : begin
+                        fsm <= SCR1_FSM_ADDR;
+                    end
+                    default : begin
+                    end
+                endcase
+            end
+            default : begin
+            end
+        endcase
+    end
+end
+
+//-------------------------------------------------------------------------------
+// Interface to core
+//-------------------------------------------------------------------------------
+
+
+always_comb begin
+    case (core_sel_r)
+        SCR1_SEL_CORE  : begin
+				core_dmem_rdata   = dmem_rdata; 
+            core_dmem_resp    = dmem_resp;
+        end
+        SCR1_SEL_RLWE  : begin
+				core_dmem_rdata   = '0; 
+            core_dmem_resp    = SCR1_MEM_RESP_NOTRDY;
+        end
+        default         : begin
+				core_dmem_rdata   = '0;
+				core_dmem_resp    = SCR1_MEM_RESP_NOTRDY;
+        end
+    endcase
+end
+
+
+//-------------------------------------------------------------------------------
+// Interface to rlwe core
+//-------------------------------------------------------------------------------
+
+
+always_comb begin
+    case (core_sel_r)
+        SCR1_SEL_CORE  : begin
+				rlwe_dmem_rdata   = '0; 
+            rlwe_dmem_resp    = SCR1_MEM_RESP_NOTRDY;
+        end
+        SCR1_SEL_RLWE  : begin
+				rlwe_dmem_rdata   = dmem_rdata; 
+            rlwe_dmem_resp    = dmem_resp;
+        end
+        default         : begin
+				rlwe_dmem_rdata   = '0;
+				rlwe_dmem_resp    = SCR1_MEM_RESP_NOTRDY;
+        end
+    endcase
+end
+
+
+
+
 //-------------------------------------------------------------------------------
 // Core interface
 //-------------------------------------------------------------------------------
@@ -69,8 +208,12 @@ always_ff @(posedge clk, negedge rst_n) begin
     end
 end
 
+
+
 assign imem_req_ack = 1'b1;
-assign dmem_req_ack = 1'b1;
+assign core_dmem_req_ack = 1'b1;
+assign rlwe_dmem_req_ack = 1'b1;
+assign sel_req_ack = 1'b1;
 //-------------------------------------------------------------------------------
 // Memory data composing
 //-------------------------------------------------------------------------------
@@ -135,6 +278,6 @@ always_ff @(posedge clk) begin
 end
 
 assign dmem_rdata[0] = dmem_rdata_local[0] >> ( 8 * dmem_rdata_shift_reg );
-assign dmem_rdata[15:1] = dmem_rdata_local[15:1];
+assign dmem_rdata[`LANE - 1:1] = dmem_rdata_local[`LANE - 1:1];
 
 endmodule : scr1_tcm
