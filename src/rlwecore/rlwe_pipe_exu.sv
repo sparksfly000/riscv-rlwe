@@ -169,6 +169,13 @@ type_vector				           ialu_res;
 logic [`SCR1_XLEN-1:0]          ialu_sum2_res;
 logic                           ialu_cmp;
 
+logic [5:0]                     irlwe_as1_offset;
+logic [5:0]                     irlwe_ad_offset;
+logic [`SCR1_XLEN-1:0]          irlwe_as1;
+logic [`SCR1_XLEN-1:0]          irlwe_as2;
+logic [`SCR1_XLEN-1:0]          irlwe_ad;
+logic                           irlwe_rdy;
+
 // LSU signals
 logic                           lsu_req;
 logic                           rlwe_vd;
@@ -212,7 +219,7 @@ assign queue_barrier    =   wfi_halted | wfi_run2halt | wfi_run_start
                             | dbg_halted | dbg_run2halt | (dbg_run_start & ~fetch_dbgc)
 `endif // SCR1_DBGC_EN
 ;
-assign exu2idu_rdy      = exu_rdy & ~queue_barrier;
+assign exu2idu_rdy      = exu_rdy & ~queue_barrier ;
 
 always_ff @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
@@ -265,7 +272,10 @@ assign queue_barrier    =   wfi_halted | wfi_run_start
                             | dbg_halted | (dbg_run_start & ~fetch_dbgc)
 `endif // SCR1_DBGC_EN
 ;
-assign exu2idu_rdy      = exu_rdy & ~queue_barrier;
+logic ntt_end;
+assign exu2idu_rdy      = (exu_rdy | ntt_end) & ~queue_barrier;
+always_ff@(posedge clk)
+		irlwe_rdy <= exu2idu_rdy;
 assign exu_queue_vd     = idu2exu_req & ~queue_barrier;
 assign exu_queue        = idu2exu_cmd;
 assign rlwe_exu_queue   = idu2exu_rlwe_cmd;
@@ -331,6 +341,9 @@ assign rs1_is_vector = exu_queue.rs1_is_vector;
 assign rs2_is_vector = exu_queue.rs2_is_vector; 
 assign rd_is_vector = exu_queue.rd_is_vector; 
 
+
+logic valid_out;  // The NTT/INTT valid out signal
+logic ntt_valid;
 //-------------------------------------------------------------------------------
 // Integer Arithmetic Logic Unit (IALU)
 //-------------------------------------------------------------------------------
@@ -362,7 +375,20 @@ rlwe_pipe_ialu i_ialu(
     // SUM2
     .ialu_sum2_op1      (ialu_sum2_op1),
     .ialu_sum2_op2      (ialu_sum2_op2),
-    .ialu_sum2_res      (ialu_sum2_res)
+    .ialu_sum2_res      (ialu_sum2_res),
+	
+	// RLWE ADDR GEN
+	 .irlwe_cmd         (rlwe_exu_queue),
+	 .irlwe_dmem_resp   (dmem2exu_resp ),
+	 .irlwe_rdy         (irlwe_rdy),
+	 .irlwe_as1_offset  (rlwe_exu_queue.as1),
+	 .irlwe_as2_offset  (rlwe_exu_queue.as2),
+	 .irlwe_ad_offset   (rlwe_exu_queue.ad),
+	 .irlwe_valid_in    (ntt_valid),
+	 .irlwe_valid_out   (valid_out),
+	 .irlwe_as1         (irlwe_as1 ),
+	 .irlwe_as2         (irlwe_as2 ),
+	 .irlwe_ad          (irlwe_ad)
 );
 
 /*
@@ -411,22 +437,22 @@ type_fsm_rlwe_e rlwe_fsm;
 
 logic [7:0] exe_cycle;
 always_ff @(posedge clk or negedge rst_n) begin
-		if(!rst_n) begin
+		if(!rst_n |exu2idu_rdy) begin
 			rlwe_fsm  <= RLWE_IDIE;
 			exe_cycle <= '0;
 		end else begin
 			 case(rlwe_fsm) 
 				RLWE_IDIE : begin
-					if(rlwe_vd)
+					if(rlwe_vd & exe_cycle !=63)
 						rlwe_fsm <= RLWE_EXE;
 				end
 				RLWE_EXE : begin
 					if(dmem2exu_resp == SCR1_MEM_RESP_RDY_OK | dmem2exu_resp == SCR1_MEM_RESP_RDY_ER) begin
-						rlwe_fsm  <= RLWE_EXE_MID;
 							if(exe_cycle!= 63) begin
 								exe_cycle <= exe_cycle + 1'b1;
+								rlwe_fsm  <= RLWE_EXE_MID;
 							end else begin
-								exe_cycle <= '0;
+								rlwe_fsm <= RLWE_IDIE;
 							end
 					end
 				end
@@ -442,22 +468,26 @@ always_ff @(posedge clk or negedge rst_n) begin
 		end 
 end
 
+
 always_comb begin
 	case(rlwe_fsm)
-		RLWE_IDIE : lsu_req = 1'b0;
-		RLWE_EXE  : lsu_req = 1'b1;
-		RLWE_EXE  : lsu_req = 1'b0;
-		default   : lsu_req = 1'b0;
+		RLWE_IDIE 		: lsu_req = 1'b0;
+		RLWE_EXE  		: lsu_req = 1'b1;
+		RLWE_EXE_MID   : lsu_req = 1'b0;
+		default   		: lsu_req = 1'b0;
 	endcase
 end
 
+logic [`SCR1_XLEN - 1 : 0] rlwe_addr;
+assign rlwe_addr = valid_out ? irlwe_ad : irlwe_as1;
 rlwe_pipe_rlwe i_rlwe(
     .rst_n              (rst_n),
     .clk                (clk),
 
     .exu2lsu_req        (lsu_req),              // Request to LSU
-    .exu2lsu_cmd        (exu_queue.lsu_cmd),    // LSU command
-    .exu2lsu_addr       (ialu_sum2_res),        // DMEM address
+	 .exu2rlwe_vd_wr     (valid_out),
+    .exu2lsu_cmd        (SCR1_LSU_CMD_LV),    // LSU command
+    .exu2lsu_addr       (rlwe_addr),        // DMEM address
     .exu2lsu_s_data     (mprf2exu_rs2_data),    // Data for store to DMEM
     .lsu2exu_rdy        (lsu_rdy),              // LSU ready
     .lsu2exu_l_data     (lsu_l_data),           // Loaded data form DMEM
@@ -472,14 +502,54 @@ rlwe_pipe_rlwe i_rlwe(
 `endif // SCR1_BRKM_EN
 
     .lsu2dmem_req       (exu2dmem_req),         // DMEM request
-    .lsu2dmem_cmd       (exu2dmem_cmd),         // DMEM command
+    .lsu2dmem_cmd       (            ),         // DMEM command
     .lsu2dmem_width     (exu2dmem_width),       // DMEM width
     .lsu2dmem_addr      (exu2dmem_addr),        // DMEM address
-    .lsu2dmem_wdata     (exu2dmem_wdata),       // DMEM write data
+    .lsu2dmem_wdata     (             ),       // DMEM write data
     .dmem2lsu_req_ack   (dmem2exu_req_ack),     // DMEM request acknowledge
     .dmem2lsu_rdata     (dmem2exu_rdata),       // DMEM read data
     .dmem2lsu_resp      (dmem2exu_resp)         // DMEM response
 );
+
+
+
+//-------------------------------------------------------------------------------
+// NTT/INTT unit
+//-------------------------------------------------------------------------------
+type_vector data_in;
+type_vector data_out;
+logic [7:0] count;
+logic is_NTT,is_INTT;
+assign ntt_instr = rlwe_exu_queue.rlwe_op == MICRO_NTT;
+assign intt_instr = rlwe_exu_queue.rlwe_op == MICRO_INTT;
+always_ff@(posedge clk or negedge rst_n) begin
+	if(!rst_n)
+		count <= '0;
+	else if (ntt_valid & count !=64)
+		count <= count + 1'b1;
+	if(exu2idu_rdy)
+		count <= '0;
+end
+
+assign ntt_valid = count!=64 && dmem2exu_resp == SCR1_MEM_RESP_RDY_OK && (ntt_instr | intt_instr )&& rlwe_exu_queue.rlwe_valid && exu_queue_vd ;
+assign data_in = dmem2exu_rdata;
+NTT NTT(
+	.clk				(clk			),
+	.rst_n			(rst_n		),
+	.is_inv_ntt    (intt_instr & ~ntt_instr),
+	.valid_in		(ntt_valid	),
+	.lane_in			(data_in		),
+	.lane_out		(data_out	),
+	.valid_out		(valid_out	),
+	.nttend        (ntt_end    )
+);
+
+assign  exu2dmem_wdata = data_out;
+always_comb begin
+	exu2dmem_cmd = SCR1_MEM_CMD_RD;
+	if(valid_out)
+		exu2dmem_cmd = SCR1_MEM_CMD_WR;
+end
 
 
 //-------------------------------------------------------------------------------

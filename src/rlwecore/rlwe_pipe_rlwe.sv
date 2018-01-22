@@ -28,6 +28,9 @@ module rlwe_pipe_rlwe (
     output  type_scr1_exc_code_e                lsu2exu_exc_code,       // Exception code
     output  logic                               lsu_busy,
 
+    // EXU <-> RLWEinterface
+	 input   logic                               exu2rlwe_vd_wr,
+
     // BRKM <-> LSU interface
 `ifdef SCR1_BRKM_EN
     output  type_scr1_brkm_lsu_mon_s            lsu2brkm_d_mon,
@@ -85,7 +88,7 @@ always_ff @(posedge clk, negedge rst_n) begin
     end else begin
         case (fsm)
             SCR1_FSM_IDLE   : begin
-                if (exu2lsu_req & dmem2lsu_req_ack & ~lsu2exu_exc) begin
+                if ((exu2lsu_req | exu2rlwe_vd_wr) & dmem2lsu_req_ack & ~lsu2exu_exc) begin
                     fsm         <= SCR1_FSM_BUSY;
                     lsu_cmd_r   <= exu2lsu_cmd;
                 end
@@ -125,21 +128,22 @@ end
 // LSU <-> EXU interface
 //-------------------------------------------------------------------------------
 //assign lsu2exu_rdy  =   (dmem_resp_ok | dmem_resp_er);
+
 logic [10: 0] count; 
 always_ff@(posedge clk or negedge rst_n) begin
 	if(!rst_n) begin
 		count <= '0;
 		lsu2exu_rdy <= 1'b0;
-	end else if(exu2lsu_req && count!= 64) begin
+	end else if(exu2lsu_req && count!= 128) begin
 		count <= count + 1'b1;
 		lsu2exu_rdy <= 1'b0;
-	end else if(count== 64) begin
+	end else if(count== 128) begin
 		count <= '0;
-	lsu2exu_rdy <= 1'b1;
+	lsu2exu_rdy <= 1'b0;
 	end
 end
 
-//assign lsu2exu_rdy = count == 64;
+//assign lsu2exu_rdy = count == 128;
 
 assign lsu2exu_exc  =   dmem_resp_er | l_misalign | s_misalign
 `ifdef SCR1_BRKM_EN
@@ -205,8 +209,8 @@ end
 //-------------------------------------------------------------------------------
 // Data memory interface
 //-------------------------------------------------------------------------------
-assign lsu2dmem_req     = exu2lsu_req & ~lsu2exu_exc & (fsm == SCR1_FSM_IDLE);
-assign lsu2dmem_addr    = tcm_base_addr + exu2lsu_addr;
+assign lsu2dmem_req     = (exu2lsu_req & ~lsu2exu_exc & (fsm == SCR1_FSM_IDLE) )| exu2rlwe_vd_wr;
+assign lsu2dmem_addr    = exu2lsu_addr;
 
 always_comb begin
     case (exu2lsu_cmd)
@@ -250,6 +254,10 @@ always_comb begin
         end
     endcase // exu2lsu_cmd
 end
+
+
+
+
 
 `ifdef SCR1_BRKM_EN
 //-------------------------------------------------------------------------------

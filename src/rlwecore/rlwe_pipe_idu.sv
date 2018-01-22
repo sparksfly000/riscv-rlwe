@@ -108,9 +108,9 @@ always_comb begin
 	 // micro 
 	 idu2exu_rlwe_cmd.rlwe_op     = MICRO_NONE; 
     idu2exu_rlwe_cmd.rlwe_valid  = 1'b0;
-    idu2exu_rlwe_cmd.rs1_addr    = '0;
-    idu2exu_rlwe_cmd.rs2_addr    = '0;
-    idu2exu_rlwe_cmd.rd_addr     = '0;
+    idu2exu_rlwe_cmd.as1         = '0;
+    idu2exu_rlwe_cmd.as2         = '0;
+    idu2exu_rlwe_cmd.ad          = '0;
     // Clock gating
     idu2exu_use_rs1         = 1'b0;
     idu2exu_use_rs2         = 1'b0;
@@ -525,6 +525,10 @@ always_comb begin
 								if(ifu2idu_vd == 1'b1) begin
 									idu2exu_rlwe_cmd.rlwe_valid = 1'b1;
 								end
+								idu2exu_rlwe_cmd.as1    = instr[19:15];
+								idu2exu_rlwe_cmd.as2    = instr[24:20];
+								idu2exu_rlwe_cmd.ad     = instr[11: 7];
+		
                                case (funct3)
                                     3'b000  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_NTT;
                                     3'b001  : idu2exu_rlwe_cmd.rlwe_op  = MICRO_INTT;

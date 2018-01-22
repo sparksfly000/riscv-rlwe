@@ -210,9 +210,9 @@ typedef enum logic [SCR1_MICRO_OP_WIDTH_E - 1 : 0] {
 typedef struct packed {
 	 type_rlwe_sel_e  rlwe_op;	
     logic            rlwe_valid;
-    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rs1_addr;  
-    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rs2_addr;
-    logic [SCR1_GPR_FIELD_WIDTH-1:0]    rd_addr;
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    as1;  
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    as2;
+    logic [SCR1_GPR_FIELD_WIDTH-1:0]    ad;
 
 }type_rlwe_cmd_s;
 

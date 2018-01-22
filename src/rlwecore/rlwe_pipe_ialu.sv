@@ -7,6 +7,7 @@
 `include "scr1_riscv_isa_decoding.svh"
 `include "scr1_search_ms1.svh"
 `include "defines.svh"
+`include "defines.sv"   // NTT include
 
 module rlwe_pipe_ialu (
 `ifdef SCR1_RVM_EXT
@@ -30,7 +31,20 @@ module rlwe_pipe_ialu (
     input   logic [`SCR1_XLEN-1:0]          ialu_sum2_op1,
     input   logic [`SCR1_XLEN-1:0]          ialu_sum2_op2,
     // SUM2 output
-    output  logic [`SCR1_XLEN-1:0]          ialu_sum2_res
+    output  logic [`SCR1_XLEN-1:0]          ialu_sum2_res,
+
+	 //RLWE ADDR GEN
+	 input   type_rlwe_cmd_s                 irlwe_cmd,
+	 input   type_scr1_mem_resp_e            irlwe_dmem_resp,
+	 input   logic                           irlwe_rdy,
+	 input   logic [4:0]                     irlwe_as1_offset,
+	 input   logic [4:0]                     irlwe_as2_offset,
+	 input   logic [4:0]                     irlwe_ad_offset,
+	 input   logic                           irlwe_valid_in,
+	 input   logic                           irlwe_valid_out,
+	 output  logic [`SCR1_XLEN-1:0]          irlwe_as1,
+	 output  logic [`SCR1_XLEN-1:0]          irlwe_as2,
+	 output  logic [`SCR1_XLEN-1:0]          irlwe_ad
 );
 
 //-------------------------------------------------------------------------------
@@ -234,6 +248,36 @@ assign ialu_sum2_res = sum2_res[31:0];
 assign ialu_sum2_res = ialu_sum2_op1 + ialu_sum2_op2;  // Addition
 `endif // ~SCR1_RVM_EXT
 
+//------------------------------------------------------------------------------
+// RLWE addr generate
+//------------------------------------------------------------------------------
+typedef enum logic{
+		RLWE_ADDR_RET,
+		RLWE_ADDR_PLUS
+}rlwe_addr_fsm_e;
+
+rlwe_addr_fsm_e rlwe_addr_fsm;
+always_ff@(posedge clk or negedge rst_n) begin
+	if(!rst_n ) begin
+		rlwe_addr_fsm <= RLWE_ADDR_RET;
+		irlwe_as1 <= `SCR1_XLEN'h480000 ;
+		irlwe_ad <= `SCR1_XLEN'h480000 + ( 1<<($clog2(`N)+2)); // default the store address is 0x480000+(512<<2)
+	end else if(irlwe_rdy) begin
+		rlwe_addr_fsm <= RLWE_ADDR_RET;
+		irlwe_as1 <= `SCR1_XLEN'h480000 + (irlwe_as1_offset << ($clog2(`N)+2));
+		irlwe_ad <= `SCR1_XLEN'h480000 + (irlwe_ad_offset << ($clog2(`N)+2)); //
+	end else begin
+		if(irlwe_valid_in) begin
+			rlwe_addr_fsm <= RLWE_ADDR_PLUS;
+			irlwe_as1 <= irlwe_as1 + (`LANE << 2);
+		end
+		if(irlwe_valid_out) begin
+			rlwe_addr_fsm <= RLWE_ADDR_PLUS;	
+			irlwe_ad <= irlwe_ad +(`LANE << 2);
+		end
+	end
+
+end
 
 //-------------------------------------------------------------------------------
 // Local signals declaration
