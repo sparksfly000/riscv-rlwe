@@ -18,6 +18,7 @@ module scr1_dp_memory
 )
 (
     input   logic                           clk,
+	 input   logic                           rst_n,
     // Port A
     input   logic                           rena,
     input   logic [$clog2(SCR1_SIZE)-1:2]   addra,
@@ -89,6 +90,7 @@ localparam int unsigned RAM_SIZE_WORDS = SCR1_SIZE/SCR1_NBYTES;
 //-------------------------------------------------------------------------------
 logic [SCR1_WIDTH-1:0]                  ram_block [RAM_SIZE_WORDS-1:0];
 
+
 //-------------------------------------------------------------------------------
 // Port A memory behavioral description
 //-------------------------------------------------------------------------------
@@ -101,12 +103,19 @@ end
 //-------------------------------------------------------------------------------
 // Port B memory behavioral description
 //-------------------------------------------------------------------------------
-always_ff @(posedge clk) begin
-`ifdef NTTSIM
-		if(valid_out == 1'b1)
-			ram_block[513] <= 32'hffffffff;   // can't work? why?
-`endif
-    if (wenb) begin
+always_ff @(posedge clk or negedge rst_n) begin
+   if(!rst_n) begin               // initialize the ram_block;
+		$readmemh("./initializemif/w_sqrt_queue.mif",ram_block);
+		$readmemh("./initializemif/inv_w_sqrt_queue.mif",ram_block);
+		$readmemh("./initializemif/r1_GauSample.mif",ram_block);
+		$readmemh("./initializemif/r2_GauSample.mif",ram_block);
+		$readmemh("./initializemif/e1_GauSample.mif",ram_block);
+		$readmemh("./initializemif/e2_GauSample.mif",ram_block);
+		$readmemh("./initializemif/e3_GauSample.mif",ram_block);
+		$readmemh("./initializemif/message_in.mif",ram_block);
+	end
+		 
+	if (wenb) begin
 		  if(w_is_vector) begin
 		  for(int i =0; i< `LANE ; i++)
 				ram_block[addrb + i] <= datab[i];

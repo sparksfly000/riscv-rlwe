@@ -253,7 +253,8 @@ scr1_dp_memory #(
     .SCR1_SIZE  ( SCR1_TCM_SIZE )
 ) i_dp_memory (
     .clk    ( clk                                   ),
-    // Instruction port
+    .rst_n  (rst_n											 ),
+	 // Instruction port
     // Port A
     .rena   ( imem_rd                               ),
     .addra  ( imem_addr[$clog2(SCR1_TCM_SIZE)-1:2]  ),

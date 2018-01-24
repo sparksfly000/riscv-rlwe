@@ -40,11 +40,10 @@ module rlwe_pipe_ialu (
 	 input   logic [4:0]                     irlwe_as1_offset,
 	 input   logic [4:0]                     irlwe_as2_offset,
 	 input   logic [4:0]                     irlwe_ad_offset,
-	 input   logic                           irlwe_valid_in,
-	 input   logic                           irlwe_valid_out,
-	 output  logic [`SCR1_XLEN-1:0]          irlwe_as1,
-	 output  logic [`SCR1_XLEN-1:0]          irlwe_as2,
-	 output  logic [`SCR1_XLEN-1:0]          irlwe_ad
+	 input   logic                           irlwe_as1_vd,
+	 input   logic                           irlwe_as2_vd,
+	 input   logic                           irlwe_ad_vd,
+	 output  logic [`SCR1_XLEN-1:0]          irlwe_address
 );
 
 //-------------------------------------------------------------------------------
@@ -256,28 +255,57 @@ typedef enum logic{
 		RLWE_ADDR_PLUS
 }rlwe_addr_fsm_e;
 
+logic [`SCR1_XLEN-1:0]          irlwe_as1;
+logic [`SCR1_XLEN-1:0]          irlwe_as2;
+logic [`SCR1_XLEN-1:0]          irlwe_ad;
+
 rlwe_addr_fsm_e rlwe_addr_fsm;
 always_ff@(posedge clk or negedge rst_n) begin
 	if(!rst_n ) begin
 		rlwe_addr_fsm <= RLWE_ADDR_RET;
 		irlwe_as1 <= `SCR1_XLEN'h480000 ;
+		irlwe_as2 <= `SCR1_XLEN'h480000 ;
 		irlwe_ad <= `SCR1_XLEN'h480000 + ( 1<<($clog2(`N)+2)); // default the store address is 0x480000+(512<<2)
 	end else if(irlwe_rdy) begin
 		rlwe_addr_fsm <= RLWE_ADDR_RET;
 		irlwe_as1 <= `SCR1_XLEN'h480000 + (irlwe_as1_offset << ($clog2(`N)+2));
+		irlwe_as2 <= `SCR1_XLEN'h480000 + (irlwe_as2_offset << ($clog2(`N)+2));
 		irlwe_ad <= `SCR1_XLEN'h480000 + (irlwe_ad_offset << ($clog2(`N)+2)); //
 	end else begin
-		if(irlwe_valid_in) begin
+		if(irlwe_as1_vd) begin
 			rlwe_addr_fsm <= RLWE_ADDR_PLUS;
 			irlwe_as1 <= irlwe_as1 + (`LANE << 2);
 		end
-		if(irlwe_valid_out) begin
+		if(irlwe_as2_vd) begin
+			rlwe_addr_fsm <= RLWE_ADDR_PLUS;
+			irlwe_as2 <= irlwe_as2 + (`LANE << 2);
+		end
+		if(irlwe_ad_vd) begin
 			rlwe_addr_fsm <= RLWE_ADDR_PLUS;	
 			irlwe_ad <= irlwe_ad +(`LANE << 2);
 		end
 	end
 
 end
+
+/*	always_ff@(posedge clk or negedge rst_n) begin
+		if(!rst_n)
+			irlwe_address <= `SCR1_XLEN'h480000;
+		if(irlwe_as1_vd)
+			irlwe_address <= irlwe_as2;	
+		if(irlwe_as2_vd)
+			irlwe_address <= irlwe_ad;	
+		if(irlwe_ad_vd) begin
+			irlwe_address <= irlwe_as1;	
+		end
+	end
+*/
+
+	assign irlwe_address = irlwe_ad_vd  ? irlwe_ad :
+								  irlwe_as2_vd ? irlwe_as2:
+								  irlwe_as1;
+
+
 
 //-------------------------------------------------------------------------------
 // Local signals declaration

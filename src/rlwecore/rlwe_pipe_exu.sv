@@ -9,6 +9,7 @@
 `include "scr1_riscv_isa_decoding.svh"
 `include "scr1_csr.svh"
 `include "defines.svh"
+`include "defines.sv"
 
 `ifdef SCR1_DBGC_EN
  `include "scr1_dbgc.svh"
@@ -147,6 +148,15 @@ typedef enum logic [1:0] {
 		RLWE_EXE_MID
 }type_fsm_rlwe_e;
 
+typedef enum logic [2:0]{
+		PAIRWISE_IDLE,
+		PAIRWISE_AS1,
+		PAIRWISE_AS1_AS2,
+		PAIRWISE_AS2,
+		PAIRWISE_AS2_AD,
+		PAIRWISE_AD,
+		PAIRWISE_AD_AS1
+}type_fsm_pairwise_e;
 
 // Instruction queue
 logic                           exu_queue_vd;
@@ -171,9 +181,6 @@ logic                           ialu_cmp;
 
 logic [5:0]                     irlwe_as1_offset;
 logic [5:0]                     irlwe_ad_offset;
-logic [`SCR1_XLEN-1:0]          irlwe_as1;
-logic [`SCR1_XLEN-1:0]          irlwe_as2;
-logic [`SCR1_XLEN-1:0]          irlwe_ad;
 logic                           irlwe_rdy;
 
 // LSU signals
@@ -273,7 +280,8 @@ assign queue_barrier    =   wfi_halted | wfi_run_start
 `endif // SCR1_DBGC_EN
 ;
 logic ntt_end;
-assign exu2idu_rdy      = (exu_rdy | ntt_end) & ~queue_barrier;
+logic pairwise_end;
+assign exu2idu_rdy      = (exu_rdy | ntt_end | pairwise_end) & ~queue_barrier;
 always_ff@(posedge clk)
 		irlwe_rdy <= exu2idu_rdy;
 assign exu_queue_vd     = idu2exu_req & ~queue_barrier;
@@ -344,6 +352,10 @@ assign rd_is_vector = exu_queue.rd_is_vector;
 
 logic valid_out;  // The NTT/INTT valid out signal
 logic ntt_valid;
+logic pairwise_valid;
+logic [`SCR1_XLEN - 1 : 0] rlwe_addr;
+logic irlwe_as1_vd, irlwe_as2_vd, irlwe_ad_vd;
+logic irlwe_as2_vd_pre;
 //-------------------------------------------------------------------------------
 // Integer Arithmetic Logic Unit (IALU)
 //-------------------------------------------------------------------------------
@@ -384,11 +396,10 @@ rlwe_pipe_ialu i_ialu(
 	 .irlwe_as1_offset  (rlwe_exu_queue.as1),
 	 .irlwe_as2_offset  (rlwe_exu_queue.as2),
 	 .irlwe_ad_offset   (rlwe_exu_queue.ad),
-	 .irlwe_valid_in    (ntt_valid),
-	 .irlwe_valid_out   (valid_out),
-	 .irlwe_as1         (irlwe_as1 ),
-	 .irlwe_as2         (irlwe_as2 ),
-	 .irlwe_ad          (irlwe_ad)
+	 .irlwe_as1_vd      (ntt_valid | irlwe_as1_vd),
+	 .irlwe_as2_vd      (irlwe_as2_vd_pre),
+	 .irlwe_ad_vd       (valid_out | irlwe_ad_vd),
+	 .irlwe_address     (rlwe_addr)
 );
 
 /*
@@ -431,9 +442,17 @@ rlwe_pipe_lsu i_lsu(
 //-------------------------------------------------------------------------------
 // Load/Store
 //-------------------------------------------------------------------------------
-assign rlwe_vd  = ((rlwe_exu_queue.rlwe_op != MICRO_NONE) & exu_queue_vd);
+logic mul_instr,add_instr,sub_instr;
+type_pairwise_op_e pairwise_op;
+assign rlwe_vd  = (((rlwe_exu_queue.rlwe_op == MICRO_NTT) | (rlwe_exu_queue.rlwe_op == MICRO_INTT) )  & exu_queue_vd);
+assign mul_instr = rlwe_exu_queue.rlwe_op == MICRO_PAIRWISE_MUL & exu_queue_vd;
+assign add_instr = rlwe_exu_queue.rlwe_op == MICRO_PAIRWISE_ADD & exu_queue_vd;
+assign sub_instr = rlwe_exu_queue.rlwe_op == MICRO_PAIRWISE_SUB & exu_queue_vd;
+assign pairwise_vd = mul_instr | add_instr | sub_instr;
+
 //assign lsu_req = rlwe_vd;
 type_fsm_rlwe_e rlwe_fsm;
+type_fsm_pairwise_e pairwise_fsm;
 
 logic [7:0] exe_cycle;
 always_ff @(posedge clk or negedge rst_n) begin
@@ -468,7 +487,6 @@ always_ff @(posedge clk or negedge rst_n) begin
 		end 
 end
 
-
 always_comb begin
 	case(rlwe_fsm)
 		RLWE_IDIE 		: lsu_req = 1'b0;
@@ -478,13 +496,92 @@ always_comb begin
 	endcase
 end
 
-logic [`SCR1_XLEN - 1 : 0] rlwe_addr;
-assign rlwe_addr = valid_out ? irlwe_ad : irlwe_as1;
+logic [7:0] pairwise_cycle;
+logic pairwise_req;
+always_ff @(posedge clk or negedge rst_n) begin
+		if(!rst_n |exu2idu_rdy) begin
+			pairwise_fsm  <= PAIRWISE_IDLE;
+			pairwise_cycle <= '0;
+		end else begin
+			 case(pairwise_fsm) 
+				PAIRWISE_IDLE : begin
+					if(pairwise_vd & pairwise_cycle !=64)
+						pairwise_fsm <= PAIRWISE_AS1;
+				end
+				PAIRWISE_AS1 : begin
+					if(dmem2exu_resp == SCR1_MEM_RESP_RDY_OK | dmem2exu_resp == SCR1_MEM_RESP_RDY_ER) begin
+							if(pairwise_cycle!= 64) begin
+								pairwise_fsm  <= PAIRWISE_AS1_AS2;
+							end else begin
+								pairwise_fsm <= PAIRWISE_IDLE;
+							end
+					end
+				end
+				PAIRWISE_AS1_AS2: begin
+					if(pairwise_vd)
+						pairwise_fsm <= PAIRWISE_AS2;
+					else
+						pairwise_fsm <= PAIRWISE_IDLE;
+				end
+				PAIRWISE_AS2 : begin
+					if(dmem2exu_resp == SCR1_MEM_RESP_RDY_OK | dmem2exu_resp == SCR1_MEM_RESP_RDY_ER) begin
+							if(pairwise_cycle!= 64) begin
+								pairwise_fsm  <= PAIRWISE_AS2_AD;
+							end else begin
+								pairwise_fsm <= PAIRWISE_IDLE;
+							end
+					end
+				end
+				PAIRWISE_AS2_AD: begin
+					if(pairwise_vd)
+						pairwise_fsm <= PAIRWISE_AD;
+					else
+						pairwise_fsm <= PAIRWISE_IDLE;
+				end
+
+				PAIRWISE_AD : begin
+					if(dmem2exu_resp == SCR1_MEM_RESP_RDY_OK | dmem2exu_resp == SCR1_MEM_RESP_RDY_ER) begin
+							if(pairwise_cycle!= 64) begin
+								pairwise_cycle <= pairwise_cycle + 1'b1;
+								pairwise_fsm  <= PAIRWISE_AD_AS1;
+							end else begin
+								pairwise_fsm <= PAIRWISE_IDLE;
+							end
+					end
+				end
+				PAIRWISE_AD_AS1: begin
+					if(pairwise_vd)
+						pairwise_fsm <= PAIRWISE_AS1;
+					else
+						pairwise_fsm <= PAIRWISE_IDLE;
+				end
+				default : begin
+				end
+			 endcase
+		end 
+end
+
+
+always_comb begin
+	case(pairwise_fsm)
+		PAIRWISE_IDLE 		: pairwise_req = 1'b0;
+		PAIRWISE_AS1  		: pairwise_req = 1'b1;
+		PAIRWISE_AS1_AS2  : pairwise_req = 1'b0;
+		PAIRWISE_AS2  		: pairwise_req = 1'b1;
+		PAIRWISE_AS2_AD	: pairwise_req = 1'b0;
+		PAIRWISE_AD  		: pairwise_req = 1'b1;
+		PAIRWISE_AD_AS1  	: pairwise_req = 1'b0;
+		default   		   : pairwise_req = 1'b0;
+	endcase
+end
+
+
+
 rlwe_pipe_rlwe i_rlwe(
     .rst_n              (rst_n),
     .clk                (clk),
 
-    .exu2lsu_req        (lsu_req),              // Request to LSU
+    .exu2lsu_req        (lsu_req | pairwise_req),              // Request to LSU
 	 .exu2rlwe_vd_wr     (valid_out),
     .exu2lsu_cmd        (SCR1_LSU_CMD_LV),    // LSU command
     .exu2lsu_addr       (rlwe_addr),        // DMEM address
@@ -518,8 +615,8 @@ rlwe_pipe_rlwe i_rlwe(
 //-------------------------------------------------------------------------------
 type_vector data_in;
 type_vector data_out;
+type_vector irlwe_ad;
 logic [7:0] count;
-logic is_NTT,is_INTT;
 assign ntt_instr = rlwe_exu_queue.rlwe_op == MICRO_NTT;
 assign intt_instr = rlwe_exu_queue.rlwe_op == MICRO_INTT;
 always_ff@(posedge clk or negedge rst_n) begin
@@ -531,7 +628,7 @@ always_ff@(posedge clk or negedge rst_n) begin
 		count <= '0;
 end
 
-assign ntt_valid = count!=64 && dmem2exu_resp == SCR1_MEM_RESP_RDY_OK && (ntt_instr | intt_instr )&& rlwe_exu_queue.rlwe_valid && exu_queue_vd ;
+assign ntt_valid = count!=64 && dmem2exu_resp == SCR1_MEM_RESP_RDY_OK && (ntt_instr | intt_instr)&& rlwe_exu_queue.rlwe_valid && exu_queue_vd ;
 assign data_in = dmem2exu_rdata;
 NTT NTT(
 	.clk				(clk			),
@@ -544,13 +641,51 @@ NTT NTT(
 	.nttend        (ntt_end    )
 );
 
-assign  exu2dmem_wdata = data_out;
+assign  exu2dmem_wdata =  valid_out ? data_out :
+								  irlwe_ad_vd ? irlwe_ad : 'x;
 always_comb begin
 	exu2dmem_cmd = SCR1_MEM_CMD_RD;
-	if(valid_out)
+	if(valid_out | irlwe_ad_vd)
 		exu2dmem_cmd = SCR1_MEM_CMD_WR;
 end
 
+
+//------------------------------------------------------------------------------------------------------
+// pairwise alu unit
+//------------------------------------------------------------------------------------------------------
+assign irlwe_as1_vd = pairwise_fsm == PAIRWISE_AS1 & pairwise_valid;
+assign irlwe_as2_vd = pairwise_fsm == PAIRWISE_AS2 & pairwise_valid;
+assign irlwe_as2_vd_pre = pairwise_fsm == PAIRWISE_AS2 & !pairwise_valid;
+logic [7:0] pairwise_count;
+
+always_ff@(posedge clk or negedge rst_n) begin
+	if(!rst_n)
+		pairwise_count <= '0;
+	else if (irlwe_as1_vd)
+		pairwise_count <= pairwise_count + 1'b1;
+	if(exu2idu_rdy)
+		pairwise_count <= '0;
+end
+
+assign pairwise_valid = pairwise_count!=65 && dmem2exu_resp == SCR1_MEM_RESP_RDY_OK && pairwise_vd && rlwe_exu_queue.rlwe_valid ;
+assign pairwise_op = mul_instr ? PAIRWISE_MUL :
+				  add_instr ? PAIRWISE_ADD :
+				  sub_instr ? PAIRWISE_SUB :
+								  PAIRWISE_NONE; 
+pairwiseALU ipairwiseALU(
+		// -------------- input --------------
+		.clk           (clk),
+		.rst_n         (rst_n),
+		.as1_vd        (irlwe_as1_vd),
+		.as2_vd        (irlwe_as2_vd),
+		.as1           (data_in), 
+		.as2           (data_in),
+		.op            (pairwise_op),
+		// ---------------- output ------------
+		.ad_vd         (irlwe_ad_vd),
+		.ad            (irlwe_ad),
+		.pairwise_end  (pairwise_end)
+);
 
 //-------------------------------------------------------------------------------
 // CSR logic
