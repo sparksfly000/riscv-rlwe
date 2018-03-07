@@ -148,14 +148,17 @@ typedef enum logic [1:0] {
 		RLWE_EXE_MID
 }type_fsm_rlwe_e;
 
-typedef enum logic [2:0]{
+typedef enum logic [3:0]{
 		PAIRWISE_IDLE,
 		PAIRWISE_AS1,
 		PAIRWISE_AS1_AS2,
 		PAIRWISE_AS2,
 		PAIRWISE_AS2_AD,
+		PAIRWISE_MUL_EXT1,
+		PAIRWISE_MUL_EXT2,
 		PAIRWISE_AD,
 		PAIRWISE_AD_AS1
+
 }type_fsm_pairwise_e;
 
 // Instruction queue
@@ -533,10 +536,22 @@ always_ff @(posedge clk or negedge rst_n) begin
 					end
 				end
 				PAIRWISE_AS2_AD: begin
-					if(pairwise_vd)
-						pairwise_fsm <= PAIRWISE_AD;
-					else
+					if(pairwise_vd) begin
+						if(pairwise_op == PAIRWISE_MUL)
+							pairwise_fsm <= PAIRWISE_MUL_EXT1;
+						else
+							pairwise_fsm <= PAIRWISE_AD;
+						
+					end else
 						pairwise_fsm <= PAIRWISE_IDLE;
+				end
+
+				PAIRWISE_MUL_EXT1: begin
+					 pairwise_fsm <= PAIRWISE_MUL_EXT2;
+				end
+
+				PAIRWISE_MUL_EXT2: begin
+					 pairwise_fsm <= PAIRWISE_AD;
 				end
 
 				PAIRWISE_AD : begin
@@ -569,6 +584,8 @@ always_comb begin
 		PAIRWISE_AS1_AS2  : pairwise_req = 1'b0;
 		PAIRWISE_AS2  		: pairwise_req = 1'b1;
 		PAIRWISE_AS2_AD	: pairwise_req = 1'b0;
+		PAIRWISE_MUL_EXT1 : pairwise_req = 1'b0;
+		PAIRWISE_MUL_EXT2 : pairwise_req = 1'b0;
 		PAIRWISE_AD  		: pairwise_req = 1'b1;
 		PAIRWISE_AD_AS1  	: pairwise_req = 1'b0;
 		default   		   : pairwise_req = 1'b0;

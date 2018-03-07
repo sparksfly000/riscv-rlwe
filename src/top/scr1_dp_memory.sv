@@ -105,14 +105,14 @@ end
 //-------------------------------------------------------------------------------
 always_ff @(posedge clk or negedge rst_n) begin
    if(!rst_n) begin               // initialize the ram_block;
-		$readmemh("./initializemif/w_sqrt_queue.mif",ram_block);
-		$readmemh("./initializemif/inv_w_sqrt_queue.mif",ram_block);
-		$readmemh("./initializemif/r1_GauSample.mif",ram_block);
-		$readmemh("./initializemif/r2_GauSample.mif",ram_block);
-		$readmemh("./initializemif/e1_GauSample.mif",ram_block);
-		$readmemh("./initializemif/e2_GauSample.mif",ram_block);
-		$readmemh("./initializemif/e3_GauSample.mif",ram_block);
-		$readmemh("./initializemif/message_in.mif",ram_block);
+		$readmemh("./initializemif/w_sqrt_queue.mif",ram_block,14'h400);
+		$readmemh("./initializemif/inv_w_sqrt_queue.mif",ram_block,14'h600);
+		$readmemh("./initializemif/r1_GauSample.mif",ram_block,14'h800);
+		$readmemh("./initializemif/r2_GauSample.mif",ram_block,14'ha00);
+		$readmemh("./initializemif/e1_GauSample.mif",ram_block,14'hc00);
+		$readmemh("./initializemif/e2_GauSample.mif",ram_block,14'he00);
+		$readmemh("./initializemif/e3_GauSample.mif",ram_block,14'h1000);
+		$readmemh("./initializemif/message_in.mif",ram_block,14'h3e00);
 	end
 		 
 	if (wenb) begin
