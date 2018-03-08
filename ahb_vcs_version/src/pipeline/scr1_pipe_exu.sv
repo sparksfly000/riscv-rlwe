@@ -312,8 +312,8 @@ always_comb begin
     end
 end
 
-assign exu2mprf_rs1_addr    = {`LANE{`SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs1_addr)}};
-assign exu2mprf_rs2_addr    = {`LANE{`SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs2_addr)}};
+assign exu2mprf_rs1_addr    = `SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs1_addr);
+assign exu2mprf_rs2_addr    = `SCR1_MPRF_ADDR_WIDTH'(exu_queue.rs2_addr);
 
 assign rs1_is_vector = exu_queue.rs1_is_vector; 
 assign rs2_is_vector = exu_queue.rs2_is_vector; 
