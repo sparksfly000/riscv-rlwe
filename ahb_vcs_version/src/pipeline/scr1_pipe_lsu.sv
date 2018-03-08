@@ -166,7 +166,7 @@ always_comb begin
     case (lsu_cmd_r)
         SCR1_LSU_CMD_LV     : lsu2exu_l_data = dmem2lsu_rdata;
         SCR1_LSU_CMD_LW     : begin lsu2exu_l_data[0] = dmem2lsu_rdata[0];
-												lsu2exu_l_data[`LANE - 1 :1] = '0;
+												lsu2exu_l_data[`LANE - 1:1] = '0;
 										end
         SCR1_LSU_CMD_LH     : begin lsu2exu_l_data[0] = signed'(dmem2lsu_rdata[0][15:0]);
 												lsu2exu_l_data[`LANE - 1:1] = '0;

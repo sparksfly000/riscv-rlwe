@@ -6,6 +6,7 @@
 `include "scr1_arch_description.svh"
 `include "scr1_memif.svh"
 `include "scr1_ahb.svh"
+`include "defines.svh"
 `ifdef SCR1_IPIC_EN
 `include "scr1_ipic.svh"
 `endif // SCR1_IPIC_EN
@@ -113,8 +114,8 @@ type_scr1_mem_resp_e                                ahb_dmem_resp;
 logic                                               tcm_imem_req_ack;
 logic                                               tcm_imem_req;
 type_scr1_mem_cmd_e                                 tcm_imem_cmd;
-logic [`SCR1_IMEM_AWIDTH-1:0]                       tcm_imem_addr;
-logic [`SCR1_IMEM_DWIDTH-1:0]                       tcm_imem_rdata;
+logic [`SCR1_DMEM_AWIDTH-1:0]                       tcm_imem_addr;
+logic [`SCR1_DMEM_AWIDTH-1:0]                       tcm_imem_rdata;
 type_scr1_mem_resp_e                                tcm_imem_resp;
 
 // Data memory interface from router to TCM

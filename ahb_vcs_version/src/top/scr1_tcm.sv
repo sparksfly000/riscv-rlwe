@@ -135,6 +135,6 @@ always_ff @(posedge clk) begin
 end
 
 assign dmem_rdata[0] = dmem_rdata_local[0] >> ( 8 * dmem_rdata_shift_reg );
-assign dmem_rdata[`LANE - 1:1] = dmem_rdata_local[`LANE - 1:1];
+assign dmem_rdata[`LANE - 1: 1] = dmem_rdata_local[`LANE - 1:1];
 
 endmodule : scr1_tcm

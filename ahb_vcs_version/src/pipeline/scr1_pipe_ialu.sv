@@ -208,7 +208,7 @@ always_comb begin
             SCR1_IALU_FSM_CORR : begin
                 logic           sgn;
                 logic           inv;
-                sgn         = (~div_cmd[0] & ialu_op1[0][31]) ^ res32_1_c_reg[0][0];  //using the lane 0
+                sgn         = (~div_cmd[0] & ialu_op1[0][31]) ^ res32_1_c_reg[0];  //using the lane 0
                 inv         = (~div_cmd[0] & (ialu_op1[0][31] ^ ialu_op2[0][31]));
                 sum2_sub    = ~inv ^ sgn;
                 sum2_op1    = signed'({1'b0, res32_1_reg[0]});   //using the lane 0

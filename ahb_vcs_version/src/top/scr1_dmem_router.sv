@@ -193,7 +193,7 @@ always_comb begin
 end
 
 assign port0_cmd    = (port_sel == SCR1_SEL_PORT0) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port0_width  = (port_sel == SCR1_SEL_PORT0) ? dmem_width : 'x;
+assign port0_width  = (port_sel == SCR1_SEL_PORT0) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
 assign port0_addr   = (port_sel == SCR1_SEL_PORT0) ? dmem_addr  : 'x;
 assign port0_wdata  = (port_sel == SCR1_SEL_PORT0) ? dmem_wdata[0] : 'x;
 
@@ -217,7 +217,7 @@ always_comb begin
 end
 
 assign port1_cmd    = (port_sel == SCR1_SEL_PORT1) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port1_width  = (port_sel == SCR1_SEL_PORT1) ? dmem_width : 'x;
+assign port1_width  = (port_sel == SCR1_SEL_PORT1) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
 assign port1_addr   = (port_sel == SCR1_SEL_PORT1) ? dmem_addr  : 'x;
 assign port1_wdata  = (port_sel == SCR1_SEL_PORT1) ? dmem_wdata : 'x;
 
@@ -241,7 +241,7 @@ always_comb begin
 end
 
 assign port2_cmd    = (port_sel == SCR1_SEL_PORT2) ? dmem_cmd   : SCR1_MEM_CMD_ERROR;
-assign port2_width  = (port_sel == SCR1_SEL_PORT2) ? dmem_width : 'x;
+assign port2_width  = (port_sel == SCR1_SEL_PORT2) ? dmem_width : SCR1_MEM_WIDTH_ERROR;
 assign port2_addr   = (port_sel == SCR1_SEL_PORT2) ? dmem_addr  : 'x;
 assign port2_wdata  = (port_sel == SCR1_SEL_PORT2) ? dmem_wdata[0] : 'x;
 
